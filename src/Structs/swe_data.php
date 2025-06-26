@@ -12,7 +12,7 @@ class swe_data
     public bool $jpl_file_is_open = false;
     public string $ephepath = "sweph/ephe/";
     public string $jplfnam = ""; // TODO:
-    public int $jpldenum;
+    public int $jpldenum = 0;
 
     // delta t/tidal acceleration variables
     public float $tid_acc = SweTidalAccel::SE_TIDAL_DEFAULT;

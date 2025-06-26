@@ -5,7 +5,7 @@ class SweDate extends SweModule
 
     public function __construct(SwePhp $base)
     {
-        $this->swePhp = $base;
+        parent::__construct($base);
     }
 
     static bool $init_leapseconds_done = false;
@@ -199,13 +199,13 @@ class SweDate extends SweModule
     {
         if ($gregflag != self::SE_GREG_CAL && $gregflag != self::SE_JUL_CAL)
             throw new ValueError(sprintf("Invalid calendar (%d)", $gregflag));
-        //
-        // error handling: invalid iyear etc.
-        //
         $iyear2 = 0;
         $imonth2 = 0;
         $iday2 = 0;
         $d = 0;
+        //
+        // error handling: invalid iyear etc.
+        //
         $tjd_ut1 = $this->swe_julday($iyear, $imonth, $iday, 0, $gregflag);
         $this->swe_revjul($tjd_ut1, $gregflag, $iyear2, $imonth2, $iday2, $d);
         if ($iyear != $iyear2 || $imonth != $imonth2 || $iday != $iday2) {
@@ -294,5 +294,99 @@ class SweDate extends SweModule
         $dret[0] = $tjd_et;
         $dret[1] = $tjd_ut1;
         return SweConst::OK;
+    }
+
+    public function swe_jdet_to_utc(float $tjd_et, int $gregflag, int &$iyear, int &$imonth, int &$iday,
+                                    int   &$ihour, int &$imin, float &$dsec): void
+    {
+        $iyear2 = 0;
+        $imonth2 = 0;
+        $iday2 = 0;
+        $dret = [];
+        $second_60 = 0;
+        //
+        // if tjd_et is before 1 jan 1972 UTC, return UT1
+        //
+        $tjd_et_1972 = self::J1972 + (32.184 + self::NLEAP_INIT) / 86400.0;
+        $d = $this->swePhp->swephLib->swe_deltat_ex($tjd_et, -1);
+        $tjd_ut = $tjd_et - $this->swePhp->swephLib->swe_deltat_ex($tjd_et - $d, -1);
+        $tjd_ut = $tjd_et - $this->swePhp->swephLib->swe_deltat_ex($tjd_ut, -1);
+        if ($tjd_et < $tjd_et_1972) {
+            $this->swe_revjul($tjd_ut, $gregflag, $iyear, $imonth, $iday, $d);
+            $ihour = (int)$d;
+            $d -= (float)$ihour;
+            $d *= 60;
+            $imin = (int)$d;
+            $dsec = ($d - (float)$imin) * 60.0;
+            return;
+        }
+        //
+        // minimum number of leap seconds since 1972; we may be missing one leap
+        // second
+        //
+        $tabsiz_nleap = $this->init_leapsec();
+        $this->swe_revjul($tjd_ut - 1, self::SE_GREG_CAL, $iyear2, $imonth2,
+            $iday2, $d);
+        $ndat = $iyear2 * 10000 + $imonth2 * 100 + $iday2;
+        $nleap = 0;
+        for ($i = 0; $i < $tabsiz_nleap; $i++) {
+            if ($ndat <= self::$leap_seconds[$i])
+                break;
+            $nleap++;
+        }
+        // date of potentially missing leapsecond
+        if ($nleap < $tabsiz_nleap) {
+            $i = self::$leap_seconds[$nleap];
+            $iyear2 = $i / 10000;
+            $imonth2 = ($i % 10000) / 100;
+            $iday2 = $i % 100;
+            $tjd = $this->swe_julday($iyear2, $imonth2, $iday2, 0, self::SE_GREG_CAL);
+            $this->swe_revjul($tjd + 1, self::SE_GREG_CAL, $iyear2, $imonth2, $iday2, $d);
+            $this->swe_utc_to_jd($iyear2, $imonth2, $iday, 0, 0, 0, self::SE_GREG_CAL, $dret);
+            $d = $tjd_et - ($dret[0] ?? 0.0);
+            if ($d >= 0) {
+                $nleap++;
+            } else if ($d > -1.0 / 86400.0) {
+                $second_60 = 1;
+            }
+        }
+        //
+        // UTC, still unsure about one leap second
+        //
+        $tjd = self::J1972 + ($tjd_et - $tjd_et_1972 - ((float)$nleap + $second_60) / 86400.0);
+        $this->swe_revjul($tjd, self::SE_GREG_CAL, $iyear, $imonth, $iday, $d);
+        $ihour = (int)$d;
+        $d -= (float)$ihour;
+        $d *= 60;
+        $imin = (int)$d;
+        $dsec = ($d - (float)$imin) * 60.0 + $second_60;
+        //
+        // For input dates > today:
+        // If leap seconds table is not up-to-date, we'd better interpret the
+        // input time as UT1, not as UTC. How do we find out?
+        // Check, if delta_t - nleap - 32.184 > 0.9
+        //
+        $d = $this->swePhp->swephLib->swe_deltat_ex($tjd_et, -1);
+        $d = $this->swePhp->swephLib->swe_deltat_ex($tjd_et_1972 - $d, -1);
+        if ($d * 86400.0 - (float)($nleap + self::NLEAP_INIT) - 32.184 >= 1.0) {
+            $this->swe_revjul($tjd_et - $d, self::SE_GREG_CAL, $iyear, $imonth, $iday, $d);
+            $ihour = (int)$d;
+            $d -= (float)$ihour;
+            $d *= 60;
+            $imin = (int)$d;
+            $dsec = ($d - (float)$imin) * 60.0;
+        }
+        if ($gregflag == self::SE_JUL_CAL) {
+            $tjd = $this->swe_julday($iyear, $imonth, $iday, 0, self::SE_GREG_CAL);
+            $this->swe_revjul($tjd, $gregflag, $iyear, $imonth, $iday, $d);
+        }
+    }
+
+    public function swe_jdut1_to_utc(float $tjd_ut, int $gregflag, int &$iyear, int &$imonth, int &$iday,
+                                     int   &$ihour, int &$imin, float &$dsec): void
+    {
+        $tjd_et = $tjd_ut + $this->swePhp->swephLib->swe_deltat_ex($tjd_ut, -1);
+        $this->swe_jdet_to_utc($tjd_et, $gregflag, $iyear, $imonth, $iday,
+            $ihour, $imin, $dsec);
     }
 }

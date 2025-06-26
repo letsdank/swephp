@@ -22,6 +22,16 @@ class Sweph extends SweModule
         $this->swed = new swe_data();
     }
 
+    public static function square_num(array $x): float
+    {
+        return $x[0] * $x[0] + $x[1] * $x[1] + $x[2] * $x[2];
+    }
+
+    public static function dot_prod(array $x, array $y): float
+    {
+        return $x[0] * $y[0] + $x[1] * $y[1] + $x[2] * $y[2];
+    }
+
     public function swi_fopen(int $ifno, string $fname, string $ephepath, ?string &$serr = null)
     {
         // TODO:

@@ -3,8 +3,13 @@
 class SweConst
 {
     const int OK = 0;
-    const ERR = -1;
-    const AS_MAXCH = 256;
+    const int ERR = -1;
+    const int AS_MAXCH = 256;
+
+    // Mathematical constants
+    const float TWOPI = 2.0 * M_PI;
+    const float DEGTORAD = M_PI / 180.0;
+    const float RADTODEG = 180.0 / M_PI;
 
     //
     // flag bits for parameter iflag in function swe_calc()
