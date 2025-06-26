@@ -2,18 +2,20 @@
 
 namespace Structs;
 
+use Enums\SweTidalAccel;
+
 class swe_data
 {
     // TODO: Remove default values
 
     public bool $ephe_path_is_set;
-    public bool $jpl_file_is_open;
+    public bool $jpl_file_is_open = false;
     public string $ephepath = "sweph/ephe/";
     public string $jplfnam = ""; // TODO:
     public int $jpldenum;
 
     // delta t/tidal acceleration variables
-    public float $tid_acc;
+    public float $tid_acc = SweTidalAccel::SE_TIDAL_DEFAULT;
     public bool $is_tid_acc_manual = false;
     public bool $init_dt_done = false;
     public bool $swed_is_initialized;
