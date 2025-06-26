@@ -2,26 +2,18 @@
 
 namespace Tests;
 
-use PHPUnit\Framework\TestCase;
 use SweDate;
+use Tests\Base\SweTestCase;
 
-class SweDateConversionTest extends TestCase
+class SweDateConversionTest extends SweTestCase
 {
-    private SweDate $sweDate;
-
-    public function __construct()
-    {
-        parent::__construct();
-        // TODO: Get rid of this
-        $this->sweDate = new SweDate();
-    }
-
     public function test_01()
     {
         $jd = 0.0;
-        $res = $this->sweDate->swe_date_conversion(2002, 13, 1, 0, 'g', $jd);
+        $iret = $this->swe->sweDate->swe_date_conversion(2002, 13, 1, 0,
+            'g', $jd);
         // Assert that provided date is not valid
-        $this->assertEquals(\SweConst::ERR, $res);
+        $this->assertSweError($iret);
         $this->assertEquals(2452640.5, $jd);
 
         // Get revjul value and assert that it returns correct result
@@ -29,16 +21,18 @@ class SweDateConversionTest extends TestCase
         $month = 0;
         $day = 0;
         $ut = 0.0;
-        $this->sweDate->swe_revjul($jd, SweDate::SE_GREG_CAL, $year, $month, $day, $ut);
+        $this->swe->sweDate->swe_revjul($jd, SweDate::SE_GREG_CAL,
+            $year, $month, $day, $ut);
         $this->assertEquals([2003, 1, 1, 0.0], [$year, $month, $day, $ut]);
     }
 
     public function test_02()
     {
         $jd = 0.0;
-        $res = $this->sweDate->swe_date_conversion(2002, 1, 1, 0, 'g', $jd);
+        $iret = $this->swe->sweDate->swe_date_conversion(2002, 1, 1, 0,
+            'g', $jd);
         // Assert that provided date is valid
-        $this->assertEquals(\SweConst::OK, $res);
+        $this->assertSweOk($iret);
         $this->assertEquals(2452275.5, $jd);
     }
 
@@ -46,6 +40,7 @@ class SweDateConversionTest extends TestCase
     {
         $this->expectException(\ValueError::class);
         $jd = 0.0;
-        $this->sweDate->swe_date_conversion(2020, 4, 23, 23.654, 'z', $jd);
+        $this->swe->sweDate->swe_date_conversion(2020, 4, 23, 23.654,
+            'z', $jd);
     }
 }

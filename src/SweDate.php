@@ -1,7 +1,15 @@
 <?php
 
-class SweDate
+class SweDate extends SweModule
 {
+
+    public function __construct(SwePhp $base)
+    {
+        $this->swePhp = $base;
+    }
+
+    static bool $init_leapseconds_done = false;
+
     const int SE_JUL_CAL = 0;
     const int SE_GREG_CAL = 1;
 
@@ -20,7 +28,7 @@ class SweDate
                                         float $hour, string $c, float &$tjd): int
     {
         if ($c != 'g' && $c != 'j')
-            throw new ValueError("Invalid calendar '" . $c . "', must be 'g' or 'j'");
+            throw new ValueError(sprintf("Invalid calendar '%s', must be 'g' or 'j'", $c));
 
         $rday = 0;
         $rmon = 0;

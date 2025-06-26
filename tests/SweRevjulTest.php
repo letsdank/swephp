@@ -2,19 +2,11 @@
 
 namespace Tests;
 
-use PHPUnit\Framework\TestCase;
 use SweDate;
+use Tests\Base\SweTestCase;
 
-class SweRevjulTest extends TestCase
+class SweRevjulTest extends SweTestCase
 {
-    private SweDate $sweDate;
-
-    public function __construct()
-    {
-        parent::__construct();
-        // TODO: Get rid of this
-        $this->sweDate = new SweDate();
-    }
 
     public function test_01()
     {
@@ -22,7 +14,7 @@ class SweRevjulTest extends TestCase
         $jmonth = 0;
         $jday = 0;
         $jut = 0.0;
-        $this->sweDate->swe_revjul(2452275.5, SweDate::SE_GREG_CAL,
+        $this->swe->sweDate->swe_revjul(2452275.5, SweDate::SE_GREG_CAL,
             $jyear, $jmonth, $jday, $jut);
         $this->assertEquals([2002, 1, 1, 0.0], [$jyear, $jmonth, $jday, $jut]);
     }
