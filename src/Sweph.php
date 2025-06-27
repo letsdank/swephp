@@ -6,7 +6,10 @@ class Sweph extends SweModule
 {
     public swe_data $swed;
 
-    const float J2000 = 2451545.0;
+    const float J2000 = 2451545.0;          // 2000 January 1.5
+    const float B1950 = 2433282.42345905;   // 1059 January 0.923
+    const float J1900 = 2415020.0;          // 1900 January 0.5
+    const float B1850 = 2396758.2035810;    // 1850 January 16:53
 
     // TODO: Review these constants
     const int SEI_FILE_PLANET = 0;

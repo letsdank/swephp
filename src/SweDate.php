@@ -342,7 +342,7 @@ class SweDate extends SweModule
             $iday2 = $i % 100;
             $tjd = $this->swe_julday($iyear2, $imonth2, $iday2, 0, self::SE_GREG_CAL);
             $this->swe_revjul($tjd + 1, self::SE_GREG_CAL, $iyear2, $imonth2, $iday2, $d);
-            $this->swe_utc_to_jd($iyear2, $imonth2, $iday, 0, 0, 0, self::SE_GREG_CAL, $dret);
+            $this->swe_utc_to_jd($iyear2, $imonth2, $iday2, 0, 0, 0, self::SE_GREG_CAL, $dret);
             $d = $tjd_et - ($dret[0] ?? 0.0);
             if ($d >= 0) {
                 $nleap++;

@@ -6,5 +6,5 @@ class SweInternalParams
     // depends on your consumes, starting with tracing delta t values, etc.
     const bool TRACE = false;
 
-    const bool DEMO = true;
+    const bool DEMO = false;
 }
