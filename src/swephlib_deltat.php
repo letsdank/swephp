@@ -127,8 +127,7 @@ class swephlib_deltat
         $tid_acc = 0.0;
         $denumret = 0;
         $ans = 0;
-        // TODO: Remove ?? 0
-        $deltat_model = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_DELTAT->value] ?? 0;
+        $deltat_model = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_DELTAT->value];
         if ($deltat_model == 0) $deltat_model = SweModelDeltaT::default();
         $epheflag = $iflag & SwephLib::SEFLG_EPHMASK;
         $otherflag = $iflag & ~SwephLib::SEFLG_EPHMASK;
@@ -289,8 +288,7 @@ class swephlib_deltat
         // read additional values from swedelta.txt
         $tabsiz = $this->init_dt();
         $tabend = self::TABSTART + $tabsiz - 1;
-        // TODO: Remove ?? 0
-        $deltat_model = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_DELTAT->value] ?? 0;
+        $deltat_model = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_DELTAT->value];
         if ($deltat_model == 0) $deltat_model = SweModelDeltaT::default();
         $Y = 2000.0 + ($tjd - 2451544.5) / 365.25;
         if ($Y <= $tabend) {

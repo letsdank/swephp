@@ -437,9 +437,9 @@ class swephlib_precess
     function swi_epsiln(float $J, int $iflag): float
     {
         $eps = 0.;
-        $prec_model = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_PREC_LONGTERM->value] ?? 0;
-        $prec_model_short = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_PREC_SHORTTERM->value] ?? 0;
-        $jplhora_model = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_JPLHORA_MODE->value] ?? 0;
+        $prec_model = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_PREC_LONGTERM->value];
+        $prec_model_short = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_PREC_SHORTTERM->value];
+        $jplhora_model = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_JPLHORA_MODE->value];
         $is_jplhor = false;
         if ($prec_model == 0) $prec_model = SweModelPrecession::default();
         if ($prec_model_short == 0) $prec_model_short = SweModelPrecession::defaultShort();

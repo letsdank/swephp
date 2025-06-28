@@ -378,7 +378,7 @@ class swephlib_nut
         $dpsi = 0;
         $deps = 0;
         $T = ($J - Sweph::J2000) / 36525.0;
-        $nut_model = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_NUT->value] ?? 0;
+        $nut_model = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_NUT->value];
         if ($nut_model == 0) $nut_model = SweModelNutation::default();
         // luni-solar nutation
         // Fundamental arguments, Simon & al. (1994)
@@ -616,8 +616,8 @@ class swephlib_nut
 
     function calc_nutation(float $J, int $iflag, array &$nutlo): int
     {
-        $nut_model = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_NUT->value] ?? 0;
-        $jplhora_model = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_JPLHORA_MODE->value] ?? 0;
+        $nut_model = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_NUT->value];
+        $jplhora_model = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_JPLHORA_MODE->value];
         $is_jplhor = false;
         if ($nut_model == 0) $nut_model = SweModelNutation::default();
         if ($jplhora_model == 0) $jplhora_model = SweModelJPLHorizon::default();

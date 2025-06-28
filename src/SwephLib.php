@@ -264,8 +264,8 @@ class SwephLib extends SweModule
     {
         // jd0 - Julian day at midnight Universal Time
         // secs - Time of day, UT seconds since UT midnight
-        $prec_model_short = $this->swePhp->swed->astro_models[SweModel::MODEL_PREC_SHORTTERM->value] ?? 0;
-        $sidt_model = $this->swePhp->swed->astro_models[SweModel::MODEL_SIDT->value] ?? 0;
+        $prec_model_short = $this->swePhp->swed->astro_models[SweModel::MODEL_PREC_SHORTTERM->value];
+        $sidt_model = $this->swePhp->swed->astro_models[SweModel::MODEL_SIDT->value];
         if ($prec_model_short == 0) $prec_model_short = SweModelPrecession::defaultShort();
         if ($sidt_model == 0) $sidt_model = SweModelSidereal::default();
         // TODO: Uncomment this after implementation will be done.
