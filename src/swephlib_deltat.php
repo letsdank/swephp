@@ -137,10 +137,9 @@ class swephlib_deltat
         } else { // otherwise we use tid_acc consistent with epheflag
             $denum = $this->parent->getSwePhp()->swed->jpldenum;
             if ($epheflag & SweConst::SEFLG_SWIEPH)
-                $denum = $this->parent->getSwePhp()->swed->fidat[Sweph::SEI_FILE_MOON]->sweph_denum ?? 0;
-            // TODO: Remove false after implementing the swi_init_swed_if_start()
-            if (false && $this->parent->getSwePhp()->sweph->swi_init_swed_if_start() == 1 && !($epheflag & SweConst::SEFLG_MOSEPH)) {
-                if ($serr)
+                $denum = $this->parent->getSwePhp()->swed->fidat[SweConst::SEI_FILE_MOON]->sweph_denum ?? 0;
+            if ($this->parent->getSwePhp()->sweph->swi_init_swed_if_start() == 1 && !($epheflag & SweConst::SEFLG_MOSEPH)) {
+                if (isset($serr))
                     $serr = "Please call swe_set_ephe_path() or swe_set_jplfile() before calling swe_deltat_ex()";
                 $retc = $this->swi_set_tid_acc($tjd, $epheflag, $denum); // _set_ saves tid_acc in swed
             } else {
@@ -706,8 +705,8 @@ class swephlib_deltat
             // SEFLG_SWIEPH wanted or SEFLG_JPLEPH failed:
             if ($iflag & SweConst::SEFLG_SWIEPH) {
                 // TODO: Should we remove "?? null" after fptr?
-                if (($this->parent->getSwePhp()->swed->fidat[Sweph::SEI_FILE_MOON]->fptr ?? null) != null)
-                    $denum = $this->parent->getSwePhp()->swed->fidat[Sweph::SEI_FILE_MOON]->sweph_denum;
+                if (($this->parent->getSwePhp()->swed->fidat[SweConst::SEI_FILE_MOON]->fptr ?? null) != null)
+                    $denum = $this->parent->getSwePhp()->swed->fidat[SweConst::SEI_FILE_MOON]->sweph_denum;
             }
         }
         switch ($denum) {

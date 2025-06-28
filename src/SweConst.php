@@ -4,12 +4,93 @@ class SweConst
 {
     const int OK = 0;
     const int ERR = -1;
+    const int NOT_AVAILABLE = -2;
+    const int BEYOND_EPH_LIMITS = -3;
+
     const int AS_MAXCH = 256;
 
     // Mathematical constants
     const float TWOPI = 2.0 * M_PI;
+
+    const int ENDMARK = -99;
     const float DEGTORAD = M_PI / 180.0;
     const float RADTODEG = 180.0 / M_PI;
+
+    const int SEI_EPSILON = -2;
+    const int SEI_NUTATION = -1;
+    const int SEI_EMB = 0;
+    const int SEI_EARTH = 0;
+    const int SEI_SUN = 0;
+    const int SEI_MOON = 1;
+    const int SEI_MERCURY = 2;
+    const int SEI_VENUS = 3;
+    const int SEI_MARS = 4;
+    const int SEI_JUPITER = 5;
+    const int SEI_SATURN = 6;
+    const int SEI_URANUS = 7;
+    const int SEI_NEPTUNE = 8;
+    const int SEI_PLUTO = 9;
+    const int SEI_SUNBARY = 10;    /* barycentric sun */
+    const int SEI_ANYBODY = 11;    /* any asteroid */
+    const int SEI_CHIRON = 12;
+    const int SEI_PHOLUS = 13;
+    const int SEI_CERES = 14;
+    const int SEI_PALLAS = 15;
+    const int SEI_JUNO = 16;
+    const int SEI_VESTA = 17;
+
+    const int SEI_NPLANETS = 18;
+
+    const int SEI_MEAN_NODE = 0;
+    const int SEI_TRUE_NODE = 1;
+    const int SEI_MEAN_APOG = 2;
+    const int SEI_OSCU_APOG = 3;
+    const int SEI_INTP_APOG = 4;
+    const int SEI_INTP_PERG = 5;
+
+    const int SEI_NNODE_ETC = 6;
+
+    const int SEI_FLG_HELIO = 1;
+    const int SEI_FLG_ROTATE = 2;
+    const int SEI_FLG_ELLIPSE = 4;
+    // TRUE, if heliocentric earth is given instead of barycentric
+    // i.e. bary sun is computed from barycentric and heliocentric earth
+    const int SEI_FLG_EMBHEL = 8;
+
+    const int SEI_FILE_PLANET = 0;
+    const int SEI_FILE_MOON = 1;
+    const int SEI_FILE_MAIN_AST = 2;
+    const int SEI_FILE_ANY_AST = 3;
+    const int SEI_FILE_FIXSTAR = 4;
+    const int SEI_FILE_PLMOON = 5;
+
+    // Chiron's orbit becomes chaotic
+    // before 720 AD and after 4606 AD, because of close encounters
+    // with Saturn. Accepting a maximum error of 5 degrees,
+    // the ephemeris is good between the following dates:
+    // const float CHIRON_START = 1958470.5;    // 1.1.650 old limit until v. 2.00
+    const float CHIRON_START = 1967601.5;       // 1.1.675
+    const float CHIRON_END = 3419437.5;         // 1.1.4650
+
+    // Pholus's orbit is unstable as well, because he sometimes
+    // approaches Saturn.
+    // Accepting a maximum error of 5 degrees,
+    // the ephemeris is good after the following date:
+    //
+    const float PHOLUS_START = 640648.5;        // 1.1.-2958 jul
+    const float PHOLUS_END = 4390617.5;         // 1.1.7309
+
+    const float MOSHPLEPH_START = 625000.5;
+    const float MOSHPLEPH_END = 2818000.5;
+    const float MOSHLUEPH_START = 625000.5;
+    const float MOSHLUEPH_END = 2818000.5;
+    // const float MOSHNDEPH_START = -254900.5; // 14 Feb -5410 00:00 ET jul.cal.
+    // const float MOSHNDEPH_END = 3697000.5;   // 11 Dec 5409 00:00 ET, greg. cal
+    const float MOSHNDEPH_START = -3100015.5;   // 15 Aug -13200 00:00 ET jul.cal.
+    const float MOSHNDEPH_END = 8000016.5;      // 15 Mar 17191 00:00 ET, greg. cal
+
+    const float JPL_DE431_START = -3027215.5;
+    const float JPL_DE431_END = 7930192.5;
 
     const int DEG = 360000;     // degree expressed in centiseconds
     const int DEG7_30 = 2700000;// 7.5 degrees
@@ -72,9 +153,24 @@ class SweConst
     // test raw data in files sepm9*
     const int SEFLG_TEST_PLMOON = 0x00200000 | self::SEFLG_J2000 | self::SEFLG_ICRS | self::SEFLG_HELCTR | self::SEFLG_TRUEPOS;
 
+    // default ephemeris used when no ephemeris flagbit is set
+    const int SEFLG_DEFAULTEPH = SEFLG_SWIEPH;
+
     //
     // only used for experimenting with various JPL ephemeris files
     // which are available at Astrodienst's internal network
     //
     const int SE_DE_NUMBER = 431;
+    const string SE_FNAME_DE200 = "de200.eph";
+    const string SE_FNAME_DE403 = "de403.eph";
+    const string SE_FNAME_DE404 = "de404.eph";
+    const string SE_FNAME_DE405 = "de405.eph";
+    const string SE_FNAME_DE406 = "de406.eph";
+    const string SE_FNAME_DE431 = "de431.eph";
+    const string SE_FNAME_DFT = self::SE_FNAME_DE431;
+    const string SE_FNAME_DFT2 = self::SE_FNAME_DE406;
+    const string SE_STARFILE_OLD = "fixstars.cat";
+    const string SE_STARFILE = "sefstars.txt";
+    const string SE_ASTNAMFILE = "seasnam.txt";
+    const string SE_FICTFILE = "seorbel.txt";
 }

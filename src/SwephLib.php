@@ -215,8 +215,8 @@ class SwephLib extends SweModule
         $deltat = 0.0;
         if ($this->swePhp->swed->delta_t_userdef_is_set)
             return $this->swePhp->swed->delta_t_userdef;
-        if ($serr)
-            $serr[0] = "\0";
+        if (isset($serr))
+            $serr = "";
         $this->deltat->calc_deltat($tjd, $iflag, $deltat, $serr);
         return $deltat;
     }
@@ -268,8 +268,7 @@ class SwephLib extends SweModule
         $sidt_model = $this->swePhp->swed->astro_models[SweModel::MODEL_SIDT->value];
         if ($prec_model_short == 0) $prec_model_short = SweModelPrecession::defaultShort();
         if ($sidt_model == 0) $sidt_model = SweModelSidereal::default();
-        // TODO: Uncomment this after implementation will be done.
-        // $this->parent->swi_init_swed_if_start();
+        $this->swePhp->sweph->swi_init_swed_if_start();
         if ($sidt_model == SweModelSidereal::MOD_SIDT_LONGTERM) {
             if ($tjd <= swephlib_sidt::SIDT_LTERM_T0 || $tjd >= swephlib_sidt::SIDT_LTERM_T1) {
                 $gmst = $this->sidt->sidtime_long_term($tjd, $eps, $nut);
@@ -362,8 +361,7 @@ class SwephLib extends SweModule
         $nutlo = [];
         // delta t adjusted to default tidal acceleration of the moon
         $tjde = $tjd_ut + $this->swe_deltat_ex($tjd_ut, -1);
-        // TODO: Uncomment after it will be implemented
-        // $this->swi_init_swed_if_start();
+        $this->swePhp->sweph->swi_init_swed_if_start();
         $eps = $this->precess->swi_epsiln($tjde, 0) * SweConst::RADTODEG;
         $this->nut->swi_nutation($tjde, 0, $nutlo);
         for ($i = 0; $i < 2; $i++)

@@ -194,7 +194,7 @@ class swephlib_nut
         102, 1, 0, 0, 0, 61, 0, -24, 0,
         102, 0, 2, -2, 2, -118, 0, -47, 0,
         /*#endif*/
-        Sweph::ENDMARK,
+        SweConst::ENDMARK,
     ];
 
     function calc_nutation_iau1980(float $J, array &$nutlo): int
@@ -271,7 +271,7 @@ class swephlib_nut
         // first terms, not in table:
         $C = (-0.01742 * $T - 17.1996) * $ss[4][0]; // sin(OM)
         $D = (0.00089 * $T + 9.2025) * $cc[4][0];   // cos(OM)
-        for ($i = 0; $i != Sweph::ENDMARK; $i += 9) {
+        for ($i = 0; $i != SweConst::ENDMARK; $i += 9) {
             if ($nut_model != SweModelNutation::MOD_NUT_IAU_CORR_1987 && (self::nt[$i] == 101 || self::nt[$i] == 102))
                 continue;
             // argument of sine and cosine

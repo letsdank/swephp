@@ -10,8 +10,8 @@ class swe_data
 
     public bool $ephe_path_is_set = false;
     public bool $jpl_file_is_open = false;
-    public string $ephepath = "sweph/ephe/";
-    public string $jplfnam = ""; // TODO:
+    public string $ephepath = "";
+    public string $jplfnam = "";
     public int $jpldenum = 0;
     public int $last_epheflag = 0;
     public bool $geopos_is_set = false;
@@ -43,6 +43,9 @@ class swe_data
     public bool $do_interpolate_nut = false;
     public interpol $interpol;
     public array $fidat = [];
+    public array $pldat = [];
+    public array $nddat = [];
+    public array $savedat = [];
     public sid_data $sidd;
 
     public function __construct()
