@@ -11,6 +11,22 @@ class SweConst
     const float DEGTORAD = M_PI / 180.0;
     const float RADTODEG = 180.0 / M_PI;
 
+    const int DEG = 360000;     // degree expressed in centiseconds
+    const int DEG7_30 = 2700000;// 7.5 degrees
+    const int DEG15 = 15 * self::DEG;
+    const int DEG24 = 24 * self::DEG;
+    const int DEG30 = 30 * self::DEG;
+    const int DEG60 = 60 * self::DEG;
+    const int DEG90 = 90 * self::DEG;
+    const int DEG120 = 120 * self::DEG;
+    const int DEG150 = 150 * self::DEG;
+    const int DEG180 = 180 * self::DEG;
+    const int DEG270 = 270 * self::DEG;
+    const int DEG360 = 360 * self::DEG;
+
+    const float CSTORAD = (self::DEGTORAD / 360000.0);
+    const float RADTOCS = (self::RADTODEG * 360000.0);
+
     //
     // flag bits for parameter iflag in function swe_calc()
     // The flag bits are defined in such a way that iflag = 0 delivers what one

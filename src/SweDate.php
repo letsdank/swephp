@@ -163,7 +163,7 @@ class SweDate extends SweModule
             $tabsiz = self::NLEAP_SECONDS;
             $ndat_last = self::$leap_seconds[self::NLEAP_SECONDS - 1];
             // no error message if file is missing
-            if (($fp = $this->swePhp->sweph->swi_fopen(-1, "seleapsec.txt", $this->swePhp->sweph->swed->ephepath)) == null) {
+            if (($fp = $this->swePhp->sweph->swi_fopen(-1, "seleapsec.txt", $this->swePhp->swed->ephepath)) == null) {
                 return self::NLEAP_SECONDS;
             }
             while (($s = fgets($fp, SweConst::AS_MAXCH)) != null) {

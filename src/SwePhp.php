@@ -1,9 +1,13 @@
 <?php
 
+use Structs\swe_data;
+
 class SwePhp
 {
     // Main instance of the whole library
     static SwePhp $instance;
+
+    public swe_data $swed;
 
 
     public SweDate $sweDate;
@@ -12,6 +16,8 @@ class SwePhp
 
     private function __construct()
     {
+        $this->swed = new swe_data();
+
         $this->sweDate = new SweDate($this);
         $this->sweph = new Sweph($this);
         $this->swephLib = new SwephLib($this);

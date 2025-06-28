@@ -128,7 +128,7 @@ class swephlib_deltat
         $denumret = 0;
         $ans = 0;
         // TODO: Remove ?? 0
-        $deltat_model = $this->parent->getSwePhp()->sweph->swed->astro_models[SweModel::MODEL_DELTAT->value] ?? 0;
+        $deltat_model = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_DELTAT->value] ?? 0;
         if ($deltat_model == 0) $deltat_model = SweModelDeltaT::default();
         $epheflag = $iflag & SwephLib::SEFLG_EPHMASK;
         $otherflag = $iflag & ~SwephLib::SEFLG_EPHMASK;
@@ -136,9 +136,9 @@ class swephlib_deltat
         if ($iflag == -1) {
             $retc = $this->swi_get_tid_acc($tjd, 0, 9999, $denumret, $tid_acc, $serr); // for default tid_acc
         } else { // otherwise we use tid_acc consistent with epheflag
-            $denum = $this->parent->getSwePhp()->sweph->swed->jpldenum;
+            $denum = $this->parent->getSwePhp()->swed->jpldenum;
             if ($epheflag & SweConst::SEFLG_SWIEPH)
-                $denum = $this->parent->getSwePhp()->sweph->swed->fidat[Sweph::SEI_FILE_MOON]->sweph_denum ?? 0;
+                $denum = $this->parent->getSwePhp()->swed->fidat[Sweph::SEI_FILE_MOON]->sweph_denum ?? 0;
             // TODO: Remove false after implementing the swi_init_swed_if_start()
             if (false && $this->parent->getSwePhp()->sweph->swi_init_swed_if_start() == 1 && !($epheflag & SweConst::SEFLG_MOSEPH)) {
                 if ($serr)
@@ -147,7 +147,7 @@ class swephlib_deltat
             } else {
                 $retc = $this->swi_set_tid_acc($tjd, $epheflag, $denum, $serr); // _set_ saved tid_acc in swed
             }
-            $tid_acc = $this->parent->getSwePhp()->sweph->swed->tid_acc;
+            $tid_acc = $this->parent->getSwePhp()->swed->tid_acc;
         }
         $iflag = $otherflag | $retc;
         $Y = 2000.0 + ($tjd - Sweph::J2000) / 365.25;
@@ -290,7 +290,7 @@ class swephlib_deltat
         $tabsiz = $this->init_dt();
         $tabend = self::TABSTART + $tabsiz - 1;
         // TODO: Remove ?? 0
-        $deltat_model = $this->parent->getSwePhp()->sweph->swed->astro_models[SweModel::MODEL_DELTAT->value] ?? 0;
+        $deltat_model = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_DELTAT->value] ?? 0;
         if ($deltat_model == 0) $deltat_model = SweModelDeltaT::default();
         $Y = 2000.0 + ($tjd - 2451544.5) / 365.25;
         if ($Y <= $tabend) {
@@ -624,13 +624,13 @@ class swephlib_deltat
     //
     private function init_dt(): int
     {
-        if (!$this->parent->getSwePhp()->sweph->swed->init_dt_done) {
-            $this->parent->getSwePhp()->sweph->swed->init_dt_done = true;
+        if (!$this->parent->getSwePhp()->swed->init_dt_done) {
+            $this->parent->getSwePhp()->swed->init_dt_done = true;
             // no error message if file is missing
             if (($fp = $this->parent->getSwePhp()->sweph->swi_fopen(-1, "swe_deltat.txt",
-                    $this->parent->getSwePhp()->sweph->swed->ephepath)) == null &&
-                ($fp = $this->parent->getSwePhp()->sweph->swi_fopen(-1, "sedeltat.txt", 
-                    $this->parent->getSwePhp()->sweph->swed->ephepath)) == null)
+                    $this->parent->getSwePhp()->swed->ephepath)) == null &&
+                ($fp = $this->parent->getSwePhp()->sweph->swi_fopen(-1, "sedeltat.txt",
+                    $this->parent->getSwePhp()->swed->ephepath)) == null)
                 return self::TABSIZ;
             while (($s = fgets($fp, SweConst::AS_MAXCH)) != null) {
                 $sp = $s;
@@ -682,7 +682,7 @@ class swephlib_deltat
     {
         $iflag = SweConst::SEFLG_SWIEPH;
         // if jpl file is open, assume SEFLG_JPLEPH
-        if ($this->parent->getSwePhp()->sweph->swed->jpl_file_is_open)
+        if ($this->parent->getSwePhp()->swed->jpl_file_is_open)
             $iflag = SweConst::SEFLG_JPLEPH;
         return $iflag;
     }
@@ -691,8 +691,8 @@ class swephlib_deltat
                                      float &$tid_acc, ?string &$serr = null): int
     {
         $iflag &= SwephLib::SEFLG_EPHMASK;
-        if ($this->parent->getSwePhp()->sweph->swed->is_tid_acc_manual) {
-            $tid_acc = $this->parent->getSwePhp()->sweph->swed->tid_acc;
+        if ($this->parent->getSwePhp()->swed->is_tid_acc_manual) {
+            $tid_acc = $this->parent->getSwePhp()->swed->tid_acc;
             return $iflag;
         }
         if ($denum == 0) {
@@ -702,14 +702,14 @@ class swephlib_deltat
                 return $iflag;
             }
             if ($iflag & SweConst::SEFLG_JPLEPH) {
-                if ($this->parent->getSwePhp()->sweph->swed->jpl_file_is_open)
-                    $denum = $this->parent->getSwePhp()->sweph->swed->jpldenum;
+                if ($this->parent->getSwePhp()->swed->jpl_file_is_open)
+                    $denum = $this->parent->getSwePhp()->swed->jpldenum;
             }
             // SEFLG_SWIEPH wanted or SEFLG_JPLEPH failed:
             if ($iflag & SweConst::SEFLG_SWIEPH) {
                 // TODO: Should we remove "?? null" after fptr?
-                if (($this->parent->getSwePhp()->sweph->swed->fidat[Sweph::SEI_FILE_MOON]->fptr ?? null) != null)
-                    $denum = $this->parent->getSwePhp()->sweph->swed->fidat[Sweph::SEI_FILE_MOON]->sweph_denum;
+                if (($this->parent->getSwePhp()->swed->fidat[Sweph::SEI_FILE_MOON]->fptr ?? null) != null)
+                    $denum = $this->parent->getSwePhp()->swed->fidat[Sweph::SEI_FILE_MOON]->sweph_denum;
             }
         }
         switch ($denum) {
@@ -759,10 +759,10 @@ class swephlib_deltat
         $retc = $iflag;
         $denumret = 0;
         // manual tid_acc overrides automatic tid_acc
-        if ($this->parent->getSwePhp()->sweph->swed->is_tid_acc_manual)
+        if ($this->parent->getSwePhp()->swed->is_tid_acc_manual)
             return $retc;
         $retc = $this->swi_get_tid_acc($tjd_ut, $iflag, $denum, $denumret,
-            $this->parent->getSwePhp()->sweph->swed->tid_acc, $serr);
+            $this->parent->getSwePhp()->swed->tid_acc, $serr);
 
         if (SweInternalParams::TRACE) {
             // TODO: Do tracing as in C++ provided code
