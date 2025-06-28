@@ -154,7 +154,7 @@ class SweConst
     const int SEFLG_TEST_PLMOON = 0x00200000 | self::SEFLG_J2000 | self::SEFLG_ICRS | self::SEFLG_HELCTR | self::SEFLG_TRUEPOS;
 
     // default ephemeris used when no ephemeris flagbit is set
-    const int SEFLG_DEFAULTEPH = SEFLG_SWIEPH;
+    const int SEFLG_DEFAULTEPH = self::SEFLG_SWIEPH;
 
     //
     // only used for experimenting with various JPL ephemeris files
