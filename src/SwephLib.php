@@ -182,6 +182,7 @@ class SwephLib extends SweModule
         $x[4] *= SweConst::DEGTORAD;
         $this->cotrans->swi_polcart_sp($x, $x);
         $this->cotrans->swi_coortrf($x, $x, $e);
+        // TODO: - t[-_-t]
         $xsp = [$x[3], $x[4], $x[5]];
         $this->cotrans->swi_coortrf($xsp, $xsp, $e);
         $x[3] = $xsp[0];

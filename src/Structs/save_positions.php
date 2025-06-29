@@ -4,9 +4,9 @@ namespace Structs;
 
 class save_positions
 {
-    public int $ipl;
-    public float $tsave;
-    public int $iflgsave;
+    public int $ipl=0;
+    public float $tsave = 0.;
+    public int $iflgsave=0;
     // position at t = tsave,
     // in ecliptic polar (offset 0),
     //    ecliptic cartesian (offset 6),
@@ -14,5 +14,5 @@ class save_positions
     //   and equatorial cartesian coordinates (offset 18).
     // 6 doubles each for position and speed coordinates.
     //
-    public array $xsaves;
+    public array $xsaves = [];
 }

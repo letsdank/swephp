@@ -673,8 +673,6 @@ class swephlib_deltat
         return $ans;
     }
 
-
-
     function swi_guess_ephe_flag(): int
     {
         $iflag = SweConst::SEFLG_SWIEPH;

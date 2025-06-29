@@ -1,11 +1,16 @@
 <?php
 
 use Enums\SweModel;
+use Enums\SweModelNutation;
+use Enums\SweModelPrecession;
 use Enums\SwePlanet;
+use Enums\SweSiderealMode;
 use Enums\SweTidalAccel;
 use Structs\epsilon;
 use Structs\file_data;
 use Structs\nut;
+use Structs\plan_data;
+use Structs\save_positions;
 use Structs\sid_data;
 use Structs\swe_data;
 use Structs\topo_data;
@@ -111,13 +116,19 @@ class Sweph extends SweModule
     // Returns 1 if initialisation is done, otherwise 0
     function swi_init_swed_if_start(): int
     {
+        $swed =& $this->swePhp->swed;
         // initialisation of swed, when called first time from
-        if (!$this->swePhp->swed->swed_is_initialized) {
-            $this->swePhp->swed = new swe_data();
-            $this->swePhp->swed->ephepath = "sweph/ephe/";
-            $this->swePhp->swed->jplfnam = SweConst::SE_FNAME_DFT;
+        if (!$swed->swed_is_initialized) {
+            $swed = new swe_data();
+            $swed->ephepath = "sweph/ephe/";
+            $swed->jplfnam = SweConst::SE_FNAME_DFT;
             $this->swePhp->swephLib->swe_set_tid_acc(SweTidalAccel::SE_TIDAL_AUTOMATIC);
-            $this->swePhp->swed->swed_is_initialized = true;
+            $swed->swed_is_initialized = true;
+            for ($i = 0; $i <= SweConst::SEI_NPLANETS; $i++) // "<=" is correct! see decl.
+                $swed->savedat[$i] = new save_positions();
+            // clean node data space
+            for ($i = 0; $i < SweConst::SEI_NNODE_ETC; $i++)
+                $swed->nddat[$i] = new plan_data();
             return 1;
         }
         return 0;
@@ -368,13 +379,159 @@ class Sweph extends SweModule
 
     public function swi_fopen(int $ifno, string $fname, string $ephepath, ?string &$serr = null)
     {
-        // TODO:
+        $s1 = $ephepath;
+        // According to swi_cutstr() description, there is the one-line analogue:
+        $cpos = array_filter(explode(DIRECTORY_SEPARATOR, $s1));
         try {
-            return fopen($ephepath . $fname, 'r');
+            for ($i = 0; $i <= count($cpos); $i++) {
+                $s = $cpos[$i];
+                if (strcmp($s, ".") == 0) { // current directory
+                    $s = '';
+                } else {
+                    $j = strlen($s);
+                    if (!empty($s) && $s[$j - 1] != DIRECTORY_SEPARATOR)
+                        $s .= DIRECTORY_SEPARATOR;
+                }
+                $s .= $fname;
+                $fnamp = $s;
+                $fp = fopen($fnamp, 'r');
+                if ($fp != null) return $fp;
+            }
         } catch (Exception $e) {
-            if (isset($serr))
-                $serr = $e->getMessage();
-            return null;
+            $s = sprintf("SwissEph file '%s' not found in PATH '%s'", $fname, $ephepath);
+            if (isset($serr)) $serr = $s;
         }
+        return null;
+    }
+
+    function swi_get_denum(int $ipli, int $iflag)
+    {
+        $fdp = null;
+        if ($iflag & SweConst::SEFLG_MOSEPH)
+            return 403;
+        if ($iflag & SweConst::SEFLG_JPLEPH) {
+            if ($this->swePhp->swed->jpldenum > 0) {
+                return $this->swePhp->swed->jpldenum;
+            } else {
+                return SweConst::SE_DE_NUMBER;
+            }
+        }
+        if ($ipli > Sweph::SE_AST_OFFSET) {
+            $fdp =& $this->swePhp->swed->fidat[SweConst::SEI_FILE_ANY_AST];
+        } else if ($ipli > Sweph::SE_PLMOON_OFFSET) {
+            $fdp =& $this->swePhp->swed->fidat[SweConst::SEI_FILE_ANY_AST];
+        } else if ($ipli == SweConst::SEI_CHIRON ||
+            $ipli == SweConst::SEI_PHOLUS ||
+            $ipli == SweConst::SEI_CERES ||
+            $ipli == SweConst::SEI_PALLAS ||
+            $ipli == SweConst::SEI_JUNO ||
+            $ipli == SweConst::SEI_VESTA) {
+            $fdp =& $this->swePhp->swed->fidat[SweConst::SEI_FILE_MAIN_AST];
+        } else if ($ipli == SweConst::SEI_MOON) {
+            $fdp =& $this->swePhp->swed->fidat[SweConst::SEI_FILE_MOON];
+        } else {
+            $fdp =& $this->swePhp->swed->fidat[SweConst::SEI_FILE_PLANET];
+        }
+        if ($fdp != null) {
+            if ($fdp->sweph_denum != 0) {
+                return $fdp->sweph_denum;
+            } else {
+                return SweConst::SE_DE_NUMBER;
+            }
+        }
+        return SweConst::SE_DE_NUMBER;
+    }
+
+    // TODO: Make as enum
+    public function swe_set_sid_mode(int $sid_mode, float $t0, float $ayan_t0): void
+    {
+        $sip =& $this->swePhp->swed->sidd;
+        $this->swi_init_swed_if_start();
+        if ($sid_mode < 0)
+            $sid_mode = 0;
+        $sip->sid_mode = $sid_mode;
+        if ($sid_mode >= SweConst::SE_SIDBITS)
+            $sid_mode %= SweConst::SE_SIDBITS;
+        // standard equinoxes: positions always referred to ecliptic of t0
+        if ($sid_mode == SweSiderealMode::SE_SIDM_J2000->value ||
+            $sid_mode == SweSiderealMode::SE_SIDM_J1900->value ||
+            $sid_mode == SweSiderealMode::SE_SIDM_B1950->value ||
+            $sid_mode == SweSiderealMode::SE_SIDM_GALALIGN_MARDYKS->value) {
+            $sip->sid_mode = $sid_mode;
+            $sip->sid_mode |= SweConst::SE_SIDBIT_ECL_T0;
+        }
+        if ($sid_mode == SweSiderealMode::SE_SIDM_TRUE_CITRA->value ||
+            $sid_mode == SweSiderealMode::SE_SIDM_TRUE_REVATI->value ||
+            $sid_mode == SweSiderealMode::SE_SIDM_TRUE_PUSHYA->value ||
+            $sid_mode == SweSiderealMode::SE_SIDM_TRUE_SHEORAN->value ||
+            $sid_mode == SweSiderealMode::SE_SIDM_TRUE_MULA->value ||
+            $sid_mode == SweSiderealMode::SE_SIDM_GALCENT_0SAG->value ||
+            $sid_mode == SweSiderealMode::SE_SIDM_GALCENT_COCHRANE->value ||
+            $sid_mode == SweSiderealMode::SE_SIDM_GALCENT_RGILBRAND->value ||
+            $sid_mode == SweSiderealMode::SE_SIDM_GALCENT_MULA_WILHELM->value ||
+            $sid_mode == SweSiderealMode::SE_SIDM_GALEQU_IAU1958->value ||
+            $sid_mode == SweSiderealMode::SE_SIDM_GALEQU_TRUE->value ||
+            $sid_mode == SweSiderealMode::SE_SIDM_GALEQU_MULA->value) {
+            $sip->sid_mode = $sid_mode->value;
+        }
+        // make sure that sid_mode is either SE_SIDM_USER or < SE_NSIDM_PREDEF
+        if ($sid_mode >= SweSiderealMode::SE_NSIDM_PREDEF && $sid_mode != SweSiderealMode::SE_SIDM_USER->value)
+            $sip->sid_mode = $sid_mode = SweSiderealMode::SIDM_FAGAN_BRADLEY->value;
+        $this->swePhp->swed->ayana_is_set = true;
+        if ($sid_mode == SweSiderealMode::SE_SIDM_USER->value) {
+            $sip->t0 = $t0;
+            $sip->ayan_t0 = $ayan_t0;
+            $sip->t0_is_UT = false;
+            if ($sip->sid_mode & SweConst::SE_SIDBIT_USER_UT)
+                $sip->t0_is_UT = true;
+        } else {
+            $sip->t0 = self::$ayanamsa[$sid_mode]->t0;
+            $sip->ayan_t0 = self::$ayanamsa[$sid_mode]->ayan_t0;
+            $sip->t0_is_UT = self::$ayanamsa[$sid_mode]->t0_is_UT;
+        }
+        // test feature: ayanamsha using its original precession model
+        if ($sid_mode < SweSiderealMode::SE_NSIDM_PREDEF &&
+            ($sip->sid_mode & SweConst::SE_SIDBIT_PREC_ORIG) &&
+            self::$ayanamsa[$sid_mode]->prec_offset > 0) {
+            $this->swePhp->swed->astro_models[SweModel::MODEL_PREC_LONGTERM->value] = self::$ayanamsa[$sid_mode]->prec_offset;
+            $this->swePhp->swed->astro_models[SweModel::MODEL_PREC_SHORTTERM->value] = self::$ayanamsa[$sid_mode]->prec_offset;
+            // add a corresponding nutation model
+            switch (self::$ayanamsa[$sid_mode]->prec_offset) {
+                case SweModelPrecession::MOD_PREC_NEWCOMB->value:
+                    $this->swePhp->swed->astro_models[SweModel::MODEL_NUT->value] = SweModelNutation::MOD_NUT_WOOLARD;
+                    break;
+                case SweModelPrecession::MOD_PREC_IAU_1976->value:
+                    $this->swePhp->swed->astro_models[SweModel::MODEL_NUT->value] = SweModelNutation::MOD_NUT_IAU_1980;
+                    break;
+                default:
+                    break;
+            }
+        }
+        $this->calc->swi_force_app_pos_etc();
+    }
+
+    // the ayanamsa (precession in longitude)
+    // according to Newcomb's definition: 360 -
+    // longitude of the vernal point of t referred to the
+    // ecliptic of t0.
+    //
+    public function swe_get_ayanamsa(float $tjd_et): float
+    {
+        $daya = .0;
+        $iflag = $this->swePhp->swephLib->swi_guess_ephe_flag();
+        // swi... function never includes nutation
+        $this->calc->swi_get_ayanamsa_ex($tjd_et, $iflag, $daya);
+        return $daya;
+    }
+
+    public function swe_get_ayanamsa_ut(float $tjd_ut): float
+    {
+        $daya = .0;
+        $iflag = $this->swePhp->swephLib->swi_guess_ephe_flag();
+        $this->calc->swi_get_ayanamsa_ex($tjd_ut +
+            $this->swePhp->swephLib->swe_deltat_ex($tjd_ut, $iflag), 0, $daya);
+        return $daya;
     }
 }
+
+Sweph::init_ayanamsa();
