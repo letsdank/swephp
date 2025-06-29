@@ -8,6 +8,12 @@ use Tests\Base\SweTestCase;
 
 class SweCalcTest extends SweTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->swe->sweph->swe_set_ephe_path(null);
+    }
+
     public function test_01()
     {
         $flags = SweConst::SEFLG_SWIEPH | SweConst::SEFLG_SPEED;

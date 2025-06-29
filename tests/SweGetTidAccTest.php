@@ -6,9 +6,9 @@ use Tests\Base\SweTestCase;
 
 class SweGetTidAccTest extends SweTestCase
 {
-    public function __construct()
+    protected function setUp(): void
     {
-        parent::__construct();
+        parent::setUp();
         $this->swe->sweph->swe_set_ephe_path(null);
     }
 
