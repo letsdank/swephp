@@ -254,6 +254,118 @@ class Sweph extends SweModule
         }
     }
 
+    function load_dpsi_deps(): void
+    {
+        $swed =& $this->swePhp->swed;
+        $n = 0;
+        $mjd = 0;
+        $mjdsv = 0;
+        $TJDOFS = 2400000.5;
+        if ($swed->eop_dpsi_loaded > 0)
+            return;
+        $fp = $this->swi_fopen(-1, swephlib_precess::DPSI_DEPS_IAU1980_FILE_EOPC04, $swed->ephepath);
+        if ($fp == null) {
+            $swed->eop_dpsi_loaded = SweConst::ERR;
+            return;
+        }
+        // No need to alloc arrays, PHP can deal with it.
+        $swed->dpsi = [];
+        $swed->deps = [];
+        $swed->eop_tjd_beg_horizons = swephlib_precess::DPSI_DEPS_IAU1980_TJD0_HORIZONS;
+        while (($s = fgets($fp, SweConst::AS_MAXCH)) != null) {
+            // According to swi_cutstr() description, there is the one-line analogue:
+            $cpos = array_filter(explode(" ", $s));
+            if (($iyear = intval($cpos[0])) == 0)
+                continue;
+            $mjd = intval($cpos[3]);
+            // if file in one-day steps?
+            if ($mjdsv > 0 && $mjd - $mjdsv != 1) {
+                // we cannot return error but we not it as follows:
+                $swed->eop_dpsi_loaded = -2;
+                fclose($fp);
+                return;
+            }
+            if ($n == 0)
+                $swed->eop_tjd_beg_horizons = $mjd + $TJDOFS;
+            $swed->dpsi[$n] = floatval($cpos[8]);
+            $swed->deps[$n] = floatval($cpos[9]);
+            $n++;
+            $mjdsv = $mjd;
+        }
+        $swed->eop_tjd_end = $mjd + $TJDOFS;
+        $swed->eop_dpsi_loaded = 1;
+        fclose($fp);
+        // file finals.all may have some more data, and especially estimations
+        // for the near future
+        $fp = $this->swi_fopen(-1, swephlib_precess::DPSI_DEPS_IAU1980_FILE_FINALS, $swed->ephepath);
+        if ($fp == null)
+            return; // return without error as existence of file is not mandatory
+
+        while (($s = fgets($fp, SweConst::AS_MAXCH)) != null) {
+            $mjd = intval(substr($s, 7));
+            if ($mjd + $TJDOFS <= $swed->eop_tjd_end)
+                continue;
+            if ($n >= SweConst::SWE_DATA_DPSI_DEPS)
+                return;
+            // are data in one-day steps?
+            if ($mjdsv > 0 && $mjd - $mjdsv != 1) {
+                // no error, as we do have data; however, if this file is useful,
+                // then swed.eop_dpsi_loaded will be set to 2
+                $swed->eop_dpsi_loaded = -3;
+                fclose($fp);
+                return;
+            }
+            // dpsi, deps Bulletin B
+            $dpsi = floatval(substr($s, 168));
+            $deps = floatval(substr($s, 178));
+            if ($dpsi == 0) {
+                // try dpsi, deps Bulletin A
+                $dpsi = floatval(substr($s, 99));
+                $deps = floatval(substr($s, 118));
+            }
+            if ($dpsi == 0) {
+                $swed->eop_dpsi_loaded = 2;
+                fclose($fp);
+                return;
+            }
+            $swed->eop_tjd_end = $mjd + $TJDOFS;
+            $swed->dpsi[$n] = $dpsi / 1000.0;
+            $swed->deps[$n] = $deps / 1000.0;
+            $n++;
+            $mjdsv = $mjd;
+        }
+        $swed->eop_dpsi_loaded = 2;
+        fclose($fp);
+    }
+
+    // sets jpl file name.
+    // also calls swe_close(). this makes sure that swe_calc()
+    // won't return planet positions previously computed from other
+    // ephemerides
+    //
+    public function swe_set_jpl_file(string $fname): void
+    {
+        $ss = [];
+        // close all open files and delete all planetary data
+        $this->swi_close_keep_topo_etc();
+        $this->swi_init_swed_if_start();
+        // if path is contained in fname, it is filled into the path variable
+        $s = $fname;
+        $sp = strrchr($s, DIRECTORY_SEPARATOR);
+        if ($sp == null) $sp = $s; else $sp = substr($s, 1);
+        $this->swePhp->swed->jplfnam = $sp;
+        // open ephemeris
+        $retc = $this->open_jpl_file($ss, $this->swePhp->swed->jplfnam, $this->swePhp->swed->ephepath);
+        if ($retc == SweConst::OK) {
+            if ($this->swePhp->swed->jpldenum >= 403) {
+                $this->load_dpsi_deps();
+            }
+        }
+        if (SweInternalParams::TRACE) {
+            // TODO: Trace
+        }
+    }
+
     public function swi_fopen(int $ifno, string $fname, string $ephepath, ?string &$serr = null)
     {
         // TODO:

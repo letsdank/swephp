@@ -173,4 +173,8 @@ class SweConst
     const string SE_STARFILE = "sefstars.txt";
     const string SE_ASTNAMFILE = "seasnam.txt";
     const string SE_FICTFILE = "seorbel.txt";
+    const string SE_FILE_SUFFIX = "se1";
+
+    // dpsi and deps loaded for 100 years after 1962
+    const int SWE_DATA_DPSI_DEPS = 36525;
 }

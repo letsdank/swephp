@@ -49,7 +49,7 @@ class plan_data
     public float $tseg0, $tseg1;
     // pointer to unpacked cheby coeffs of segment;
     // the size is 3 x ncoe
-    public $segp;
+    public array $segp;
     // how many coefficients to evaluate. this may
     // be less than ncoe
     public int $neval;

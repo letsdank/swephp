@@ -2,6 +2,7 @@
 
 use Enums\SwePlanet;
 use Enums\SweSiderealMode;
+use Structs\epsilon;
 use Structs\file_data;
 use Structs\plan_data;
 use Structs\save_positions;
@@ -10,6 +11,11 @@ class sweph_calc
 {
     private Sweph $parent;
 
+    const array pnoint2jpl = [
+        SweJPL::J_EARTH, SweJPL::J_MOON, SweJPL::J_MERCURY, SweJPL::J_VENUS,
+        SweJPL::J_MARS, SweJPL::J_JUPITER, SweJPL::J_SATURN, SweJPL::J_URANUS,
+        SweJPL::J_NEPTUNE, SweJPL::J_PLUTO, SweJPL::J_SUN,
+    ];
     const array pnoext2int = [
         SweConst::SEI_SUN, SweConst::SEI_MOON, SweConst::SEI_MERCURY, SweConst::SEI_VENUS,
         SweConst::SEI_MARS, SweConst::SEI_JUPITER, SweConst::SEI_SATURN, SweConst::SEI_URANUS,
@@ -348,7 +354,7 @@ class sweph_calc
             $xp = $pdp->xreturn;
             switch ($epheflag) {
                 case SweConst::SEFLG_JPLEPH:
-                    $retc = $this->jplplan($tjd, $ipli, $iflag, true, null, null, null, $serr);
+                    $retc = $this->jplplan($tjd, $ipli, $iflag, true, serr: $serr);
                     // read error or corrupt file
                     if ($retc == SweConst::ERR)
                         goto return_error;
@@ -371,8 +377,7 @@ class sweph_calc
                     break;
                 case SweConst::SEFLG_SWIEPH:
                     sweph_moon:
-                    $retc = $this->sweplan($tjd, $ipli, SweConst::SEI_FILE_MOON, $iflag, true,
-                        null, null, null, null, $serr);
+                    $retc = $this->sweplan($tjd, $ipli, SweConst::SEI_FILE_MOON, $iflag, true, serr: $serr);
                     if ($retc == SweConst::ERR)
                         goto return_error;
                     // if sweph file not found, switch to moshier
@@ -451,8 +456,8 @@ class sweph_calc
                     sweph_sbar:
                     // sweplan() provides barycentric sun as a by-product in save area;
                     // it is saved in swed.pldat[SEI_SUNBARY].x
-                    $retc = $this->sweplan($tjd, SweConst::SEI_EARTH, SweConst::SEI_FILE_PLANET, $iflag, true,
-                        null, null, null, null, $serr);
+                    $retc = $this->sweplan($tjd, SweConst::SEI_EARTH, SweConst::SEI_FILE_PLANET,
+                        $iflag, true, serr: $serr);
                     if ($retc == SweConst::ERR || $retc == SweConst::NOT_AVAILABLE)
                         goto return_error;
                     $psdp->teval = $tjd;
@@ -736,7 +741,7 @@ class sweph_calc
                 $serr = '';
             }
             // asteroid
-            $retc = $this->sweph($tjd, $ipli_ast, $ifno, $iflag, $psdp->x, true, null, $serr);
+            $retc = $this->sweph($tjd, $ipli_ast, $ifno, $iflag, $psdp->x, true, serr: $serr);
             if ($retc == SweConst::ERR || $retc == SweConst::NOT_AVAILABLE)
                 goto return_error;
             $retc = $this->app_pos_etc_plan($ipli_ast, 0, $iflag, $serr);
@@ -830,5 +835,818 @@ class sweph_calc
         // clean node data space
         for ($i = 0; $i < SweConst::SEI_NNODE_ETC; $i++)
             $swed->nddat[$i] = new plan_data();
+    }
+
+    // calculates obliquity of ecliptic and stores it together
+    // with its date, sine, and cosine
+    //
+    function calc_epsilon(float $tjd, int $iflag, epsilon &$e): void
+    {
+        $e->teps = $tjd;
+        $e->eps = $this->parent->getSwePhp()->swephLib->swi_epsiln($tjd, $iflag);
+        $e->seps = sin($e->eps);
+        $e->ceps = cos($e->eps);
+    }
+
+    /* computes a main planet from any ephemeris, if it
+     * has not yet been computed for this date.
+     * since a geocentric position requires the earth, the
+     * earth's position will be computed as well. With SWISSEPH
+     * files the barycentric sun will be done as well.
+     * With Moshier, the moon will be done as well.
+     *
+     * tjd 		= julian day
+     * ipli		= body number
+     * epheflag	= which ephemeris? JPL, SWISSEPH, Moshier?
+     * iflag	= other flags
+     *
+     * the geocentric apparent position of ipli (or whatever has
+     * been specified in iflag) will be saved in
+     * &swed.pldat[ipli].xreturn[];
+     *
+     * the barycentric (heliocentric with Moshier) position J2000
+     * will be kept in
+     * &swed.pldat[ipli].x[];
+     */
+    function main_planet(float $tjd, int $ipli, int $iplmoon, int $epheflag, int $iflag, ?string &$serr = null): int
+    {
+        if (($iflag & SweConst::SEFLG_CENTER_BODY)
+            && $ipli >= SwePlanet::MARS->value && $ipli <= SwePlanet::PLUTO) {
+            //ipli_com = ipli * 100 + 9099;
+            // jupiter center of body, relative to jupiter barycenter
+            $retc = $this->sweph($tjd, $iplmoon, SweConst::SEI_FILE_ANY_AST, $iflag, null, true, serr: $serr);
+            if ($retc == SweConst::ERR || $retc == SweConst::NOT_AVAILABLE)
+                return SweConst::ERR;
+        }
+        switch ($epheflag) {
+            case SweConst::SEFLG_JPLEPH:
+                $retc = $this->jplplan($tjd, $ipli, $iflag, true, serr: $serr);
+                // read error or corrupt file
+                if ($retc == SweConst::ERR)
+                    return SweConst::ERR;
+                // jpl ephemeris not on disk or date beyond ephemeris range
+                if ($retc == SweConst::NOT_AVAILABLE) {
+                    $iflag = ($iflag & ~SweConst::SEFLG_JPLEPH) | SweConst::SEFLG_SWIEPH;
+                    if (isset($serr))
+                        $serr .= " \ntrying Swiss Eph; ";
+                    goto sweph_planet;
+                } else if ($retc == SweConst::BEYOND_EPH_LIMITS) {
+                    if ($tjd > SweConst::MOSHPLEPH_START && $tjd < SweConst::MOSHPLEPH_END) {
+                        $iflag = ($iflag & ~SweConst::SEFLG_JPLEPH) | SweConst::SEFLG_MOSEPH;
+                        if (isset($serr))
+                            $serr .= " \nusing Moshier Eph; ";
+                        goto moshier_planet;
+                    } else {
+                        return SweConst::ERR;
+                    }
+                }
+                // geocentric, lighttime etc.
+                if ($ipli == SwePlanet::SUN->value) {
+                    $retc = $this->app_pos_etc_sun($iflag, $serr);
+                } else {
+                    $retc = $this->app_pos_etc_plan($ipli, $iplmoon, $iflag, $serr);
+                }
+                if ($retc == SweConst::ERR)
+                    return SweConst::ERR;
+                // t for light-time beyond ephemeris range
+                if ($retc == SweConst::NOT_AVAILABLE) {
+                    $iflag = ($iflag & ~SweConst::SEFLG_JPLEPH) | SweConst::SEFLG_SWIEPH;
+                    if (isset($serr))
+                        $serr .= " \ntrying Swiss Eph; ";
+                    goto sweph_planet;
+                } else if ($retc == SweConst::BEYOND_EPH_LIMITS) {
+                    if ($tjd > SweConst::MOSHPLEPH_START && $tjd < SweConst::MOSHPLEPH_END) {
+                        $iflag = ($iflag & ~SweConst::SEFLG_JPLEPH) | SweConst::SEFLG_MOSEPH;
+                        if (isset($serr))
+                            $serr .= " \nusing Moshier Eph; ";
+                        goto moshier_planet;
+                    } else
+                        return SweConst::ERR;
+                }
+                break;
+            case SweConst::SEFLG_SWIEPH:
+                sweph_planet:
+                // compute barycentric planet (+ earth, sun, moon)
+                $retc = $this->sweplan($tjd, $ipli, SweConst::SEI_FILE_PLANET, $iflag, true, serr: $serr);
+                if ($retc == SweConst::ERR)
+                    return SweConst::ERR;
+                // if sweph file not found, switch to moshier
+                if ($retc == SweConst::NOT_AVAILABLE) {
+                    if ($tjd > SweConst::MOSHPLEPH_START && $tjd < SweConst::MOSHPLEPH_END) {
+                        $iflag = ($iflag & ~SweConst::SEFLG_SWIEPH) | SweConst::SEFLG_MOSEPH;
+                        if (isset($serr))
+                            $serr .= " \nusing Moshier eph.; ";
+                        goto moshier_planet;
+                    } else
+                        return SweConst::ERR;
+                }
+                // geocentric, lighttime etc.
+                if ($ipli == SwePlanet::SUN->value) {
+                    $retc = $this->app_pos_etc_sun($iflag, $serr);
+                } else {
+                    $retc = $this->app_pos_etc_plan($ipli, $iplmoon, $iflag, $serr);
+                }
+                if ($retc == SweConst::ERR)
+                    return SweConst::ERR;
+                // if sweph file for t(lighttime) not found, switch to moshier
+                if ($retc == SweConst::NOT_AVAILABLE) {
+                    if ($tjd > SweConst::MOSHPLEPH_START && $tjd < SweConst::MOSHPLEPH_END) {
+                        $iflag = ($iflag & ~SweConst::SEFLG_SWIEPH) | SweConst::SEFLG_MOSEPH;
+                        if (isset($serr))
+                            $serr .= " \nusing Moshier eph.; ";
+                        goto moshier_planet;
+                    } else
+                        return SweConst::ERR;
+                }
+                break;
+            case SweConst::SEFLG_MOSEPH:
+                moshier_planet:
+                $retc = $this->swi_moshplan($tjd, $ipli, true, null, null, $serr);
+                if ($retc == SweConst::ERR)
+                    return SweConst::ERR;
+                // geocentric, lighttime etc.
+                if ($ipli == SwePlanet::SUN->value) {
+                    $retc = $this->app_pos_etc_sun($iflag, $serr);
+                } else {
+                    $retc = $this->app_pos_etc_plan($ipli, $iplmoon, $iflag, $serr);
+                }
+                if ($retc == SweConst::ERR)
+                    return SweConst::ERR;
+                break;
+            default:
+                break;
+        }
+        return SweConst::OK;
+    }
+
+    /* Computes a main planet from any ephemeris or returns
+     * it again, if it has been computed before.
+     * In barycentric equatorial position of the J2000 equinox.
+     * The earth's position is computed as well. With SWISSEPH
+     * and JPL ephemeris the barycentric sun is computed, too.
+     * With Moshier, the moon is returned, as well.
+     *
+     * tjd 		= julian day
+     * ipli		= body number
+     * epheflag	= which ephemeris? JPL, SWISSEPH, Moshier?
+     * iflag	= other flags
+     * xp, xe, xs, and xm are the pointers, where the program
+     * either finds or stores (if not found) the barycentric
+     * (heliocentric with Moshier) positions of the following
+     * bodies:
+     * xp		planet
+     * xe		earth
+     * xs		sun
+     * xm		moon
+     *
+     * xm is used with Moshier only
+     */
+    function main_planet_bary(float $tjd, int $ipli, int $epheflag, int $iflag, bool $do_save,
+                              array &$xp, array &$xe, array &$xs, array &$xm, ?string &$serr = null): int
+    {
+        switch ($epheflag) {
+            case SweConst::SEFLG_JPLEPH:
+                $retc = $this->jplplan($tjd, $ipli, $iflag, $do_save, $xp, $xe, $xs, $serr);
+                // read error or corrupt file
+                if ($retc == SweConst::ERR || $retc == SweConst::BEYOND_EPH_LIMITS)
+                    return $retc;
+                // jpl ephemeris not on disk or date beyond ephemeris range
+                if ($retc == SweConst::NOT_AVAILABLE) {
+                    $iflag = ($iflag & ~SweConst::SEFLG_JPLEPH) | SweConst::SEFLG_SWIEPH;
+                    if (isset($serr))
+                        $serr .= " \ntrying Swiss Eph; ";
+                    goto sweph_planet;
+                }
+                break;
+            case SweConst::SEFLG_SWIEPH:
+                sweph_planet:
+                // compute barycentric planet (+ earth, sun, moon)
+                $retc = $this->sweplan($tjd, $ipli, SweConst::SEI_FILE_PLANET, $iflag, $do_save,
+                    $xp, $xe, $xs, $xm, $serr);
+                // if barycentric moshier calculation were implemented
+                if ($retc == SweConst::ERR)
+                    return SweConst::ERR;
+                // if sweph file not found, switch to moshier
+                if ($retc == SweConst::NOT_AVAILABLE) {
+                    if ($tjd > SweConst::MOSHPLEPH_START && $tjd < SweConst::MOSHPLEPH_END) {
+                        $iflag = ($iflag & ~SweConst::SEFLG_SWIEPH) | SweConst::SEFLG_MOSEPH;
+                        if (isset($serr))
+                            $serr .= " \nusing Moshier eph.; ";
+                        goto moshier_planet;
+                    } else {
+                        return SweConst::ERR;
+                    }
+                }
+                break;
+            case SweConst::SEFLG_MOSEPH:
+                moshier_planet:
+                $retc = $this->swi_moshplan($tjd, $ipli, $do_save, $xp, $xe, $serr);
+                if ($retc == SweConst::ERR)
+                    return SweConst::ERR;
+                for ($i = 0; $i <= 5; $i++)
+                    $xs[$i] = 0;
+                break;
+            default:
+                break;
+        }
+        return SweConst::OK;
+    }
+
+    /* SWISSEPH
+     * this routine computes heliocentric cartesian equatorial coordinates
+     * of equinox 2000 of
+     * geocentric moon
+     *
+     * tjd 		julian date
+     * iflag	flag
+     * do_save	save J2000 position in save area pdp->x ?
+     * xp		array of 6 doubles for lunar position and speed
+     * serr		error string
+     */
+    function swemoon(float $tjd, int $iflag, bool $do_save, array &$xpret, ?string &$serr = null): int
+    {
+        $xx = [];
+        $pdp =& $this->parent->getSwePhp()->swed->pldat[SweConst::SEI_MOON];
+        if ($do_save) {
+            $xp = $pdp->x;
+        } else {
+            $xp = $xx;
+        }
+        // if planet has already been computed for this date, return
+        // if speed flag has been turned on, recompute planet
+        $speedf1 = $pdp->xflgs & SweConst::SEFLG_SPEED;
+        $speedf2 = $iflag & SweConst::SEFLG_SPEED;
+        if ($tjd == $pdp->teval && $pdp->iephe == SweConst::SEFLG_SWIEPH && (!$speedf2 || $speedf1)) {
+            $xp = $pdp->x;
+        } else {
+            // call sweph for moon
+            $retc = $this->sweph($tjd, SweConst::SEI_MOON, SweConst::SEI_FILE_MOON, $iflag, null, $do_save, $xp, $serr);
+            if ($retc != SweConst::OK)
+                return $retc;
+            if ($do_save) {
+                $pdp->teval = $tjd;
+                $pdp->xflgs = -1;
+                $pdp->iephe = SweConst::SEFLG_SWIEPH;
+            }
+        }
+        if ($xpret != null)
+            for ($i = 0; $i <= 5; $i++)
+                $xpret[$i] = $xp[$i];
+        return SweConst::OK;
+    }
+
+    /* SWISSEPH
+     * this function computes
+     * 1. a barycentric planet
+     * plus, under certain conditions,
+     * 2. the barycentric sun,
+     * 3. the barycentric earth, and
+     * 4. the geocentric moon,
+     * in barycentric cartesian equatorial coordinates J2000.
+     *
+     * these are the data needed for calculation of light-time etc.
+     *
+     * tjd 		julian date
+     * ipli		SEI_ planet number
+     * ifno		ephemeris file number
+     * do_save	write new positions in save area
+     * xp		array of 6 doubles for planet's position and velocity
+     * xpe                                 earth's
+     * xps                                 sun's
+     * xpm                                 moon's
+     * serr		error string
+     *
+     * xp - xpm can be NULL. if do_save is TRUE, all of them can be NULL.
+     * the positions will be written into the save area (swed.pldat[ipli].x)
+     */
+    function sweplan(float  $tjd, int $ipli, int $ifno, int $iflag, bool $do_save,
+                     ?array &$xpret = null, ?array &$xperet = null, ?array &$xpsret = null,
+                     ?array &$xpmret = null, ?string &$serr = null): int
+    {
+        $do_earth = false;
+        $do_moon = false;
+        $do_sunbary = false;
+        $pdp =& $this->parent->getSwePhp()->swed->pldat[$ipli];
+        $pebdp =& $this->parent->getSwePhp()->swed->pldat[SweConst::SEI_EMB];
+        $psbdp =& $this->parent->getSwePhp()->swed->pldat[SweConst::SEI_SUNBARY];
+        $pmdp =& $this->parent->getSwePhp()->swed->pldat[SweConst::SEI_MOON];
+        $xxp = [];
+        $xxm = [];
+        $xxs = [];
+        $xxe = [];
+        // xps (barycentric sun) may be necessary because some planets on sweph
+        // file are heliocentric, other ones are barycentric. without xps,
+        // the heliocentric ones cannot be returned barycentrically.
+        //
+        if ($do_save || $ipli == SweConst::SEI_SUNBARY || ($pdp->iflg & SweConst::SEI_FLG_HELIO) ||
+            isset($xpsret) || ($iflag & SweConst::SEFLG_HELCTR))
+            $do_sunbary = true;
+        if ($do_save || $ipli == SweConst::SEI_EARTH || isset($xperet))
+            $do_earth = true;
+        if ($ipli == SweConst::SEI_MOON) {
+            $do_earth = true;
+            $do_sunbary = true;
+        }
+        if ($do_save || $ipli == SweConst::SEI_MOON || $ipli == SweConst::SEI_EARTH || isset($xperet) || isset($xpmret))
+            $do_moon = true;
+        if ($do_save) {
+            $xp = $pdp->x;
+            $xpe = $pebdp->x;
+            $xps = $psbdp->x;
+            $xpm = $pmdp->x;
+        } else {
+            $xp = $xxp;
+            $xpe = $xxe;
+            $xps = $xxs;
+            $xpm = $xxm;
+        }
+        $speedf2 = $iflag & SweConst::SEFLG_SPEED;
+        // barycentric sun
+        if ($do_sunbary) {
+            $speedf1 = $psbdp->xflgs & SweConst::SEFLG_SPEED;
+            // if planet has already been computed for this date, return
+            // if speed flag has been turned on, recompute planet
+            if ($tjd == $psbdp->teval && $psbdp->iephe == SweConst::SEFLG_SWIEPH && (!$speedf2 || $speedf1)) {
+                for ($i = 0; $i <= 5; $i++)
+                    $xps[$i] = $psbdp->x[$i];
+            } else {
+                $retc = $this->sweph($tjd, SweConst::SEI_SUNBARY, SweConst::SEI_FILE_PLANET, $iflag, null, $do_save, $xps, $serr);
+                if ($retc != SweConst::OK)
+                    return $retc;
+            }
+            if ($xpsret != null)
+                for ($i = 0; $i <= 5; $i++)
+                    $xpret[$i] = $xps[$i];
+        }
+        // moon
+        if ($do_moon) {
+            $speedf1 = $pmdp->xflgs & SweConst::SEFLG_SPEED;
+            if ($tjd == $pmdp->teval && $pmdp->iephe == SweConst::SEFLG_SWIEPH && (!$speedf2 || $speedf1)) {
+                for ($i = 0; $i <= 5; $i++)
+                    $xpm[$i] = $pmdp->x[$i];
+            } else {
+                $retc = $this->sweph($tjd, SweConst::SEI_MOON, SweConst::SEI_FILE_MOON, $iflag, null, $do_save, $xpm, $serr);
+                if ($retc == SweConst::ERR)
+                    return $retc;
+                // if moon file doesn't exist, take moshier moon
+                if ($this->parent->getSwePhp()->swed->fidat[SweConst::SEI_FILE_MOON]->fptr != null) {
+                    if (isset($serr))
+                        $serr .= " \nusing Moshier eph. for moon; ";
+                    $retc = $this->swi_moshmoon($tjd, $do_save, $xpm, $serr);
+                    if ($retc != SweConst::OK)
+                        return $retc;
+                }
+            }
+            if ($xpmret != null)
+                for ($i = 0; $i <= 5; $i++)
+                    $xpmret[$i] = $xpm[$i];
+        }
+        // barycentric earth
+        if ($do_earth) {
+            $speedf1 = $pebdp->xflgs & SweConst::SEFLG_SPEED;
+            if ($tjd == $pebdp->teval && $pebdp->iephe == SweConst::SEFLG_SWIEPH && (!$speedf2 || $speedf1)) {
+                for ($i = 0; $i <= 5; $i++)
+                    $xpe[$i] = $pebdp->x[$i];
+            } else {
+                $retc = $this->sweph($tjd, SweConst::SEI_EMB, SweConst::SEI_FILE_PLANET, $iflag, null, $do_save, $xpe, $serr);
+                if ($retc != SweConst::OK)
+                    return $retc;
+                // earth from emb and moon
+                $this->embofs($xpe, $xpm);
+                // speed is needed, if
+                // 1. true position is being computed before applying light-time etc.
+                //    this is the position saved in pdp->x.
+                //    in this case, speed is needed for light-time correction.
+                // 2. the speed flag has been specified.
+                //
+                if ($xpe == $pebdp->x || ($iflag & SweConst::SEFLG_SPEED)) {
+                    $xpeo = [$xpe[3], $xpe[4], $xpe[5]];
+                    $xpmo = [$xpm[3], $xpm[4], $xpm[5]];
+                    // TODO - t[-_-t]
+                    $this->embofs($xpeo, $xpmo);
+                    $xpe[3] = $xpeo[0];
+                    $xpe[4] = $xpeo[1];
+                    $xpe[5] = $xpeo[2];
+                    $xpm[3] = $xpmo[0];
+                    $xpm[4] = $xpmo[1];
+                    $xpm[5] = $xpmo[2];
+                }
+            }
+            if (isset($xperet))
+                for ($i = 0; $i <= 5; $i++)
+                    $xperet[$i] = $xpe[$i];
+        }
+        if ($ipli == SweConst::SEI_MOON) {
+            for ($i = 0; $i <= 5; $i++)
+                $xp[$i] = $xpm[$i];
+        } else if ($ipli == SweConst::SEI_EARTH) {
+            for ($i = 0; $i <= 5; $i++)
+                $xp[$i] = $xpe[$i];
+        } else if ($ipli == SweConst::SEI_SUN) {
+            for ($i = 0; $i <= 5; $i++)
+                $xp[$i] = $xps[$i];
+        } else {
+            // planet
+            $speedf1 = $pdp->xflgs & SweConst::SEFLG_SPEED;
+            if ($tjd == $pdp->teval && $pdp->iephe == SweConst::SEFLG_SWIEPH && (!$speedf2 || $speedf1)) {
+                for ($i = 0; $i <= 5; $i++)
+                    $xp[$i] = $pdp->x[$i];
+                return SweConst::OK;
+            } else {
+                $retc = $this->sweph($tjd, $ipli, $ifno, $iflag, null, $do_save, $xp, $serr);
+                if ($retc != SweConst::OK)
+                    return $retc;
+                // if planet is heliocentric, it must be transformed to barycentric
+                if ($pdp->iflg & SweConst::SEI_FLG_HELIO) {
+                    // now barycentric planet
+                    for ($i = 0; $i <= 2; $i++)
+                        $xp[$i] += $xps[$i];
+                    if ($do_save || ($iflag & SweConst::SEFLG_SPEED))
+                        for ($i = 3; $i <= 5; $i++)
+                            $xp[$i] += $xps[$i];
+                }
+            }
+        }
+        if (isset($xpret))
+            for ($i = 0; $i <= 5; $i++)
+                $xpret[$i] = $xp[$i];
+        return SweConst::OK;
+    }
+
+    /* jpl ephemeris.
+     * this function computes
+     * 1. a barycentric planet position
+     * plus, under certain conditions,
+     * 2. the barycentric sun,
+     * 3. the barycentric earth,
+     * in barycentric cartesian equatorial coordinates J2000.
+
+     * tjd		julian day
+     * ipli		sweph internal planet number
+     * do_save	write new positions in save area
+     * xp		array of 6 doubles for planet's position and speed vectors
+     * xpe		                       earth's
+     * xps		                       sun's
+     * serr		pointer to error string
+     *
+     * xp - xps can be NULL. if do_save is TRUE, all of them can be NULL.
+     * the positions will be written into the save area (swed.pldat[ipli].x)
+     */
+    function jplplan(float  $tjd, int $ipli, int $iflag, bool $do_save,
+                     ?array &$xpret = null, ?array &$xperet = null,
+                     ?array &$xpsret = null, ?string &$serr = null): int
+    {
+        $do_earth = false;
+        $do_sunbary = false;
+        $ss = [];
+        $xxp = [];
+        $xxe = [];
+        $xxs = [];
+        $ictr = SweJPL::J_SBARY;
+        $pdp =& $this->parent->getSwePhp()->swed->pldat[$ipli];
+        $pedp =& $this->parent->getSwePhp()->swed->pldat[SweConst::SEI_EARTH];
+        $psdp =& $this->parent->getSwePhp()->swed->pldat[SweConst::SEI_SUNBARY];
+        $iflag = SweConst::SEFLG_JPLEPH; // currently not used, but this stops compiler warning
+        // we assume Teph ~= TDB ~= TT. The maximum error is < 0.002 sec,
+        // corresponding to an ephemeris error < 0.001 arcsec for the moon
+        if ($do_save) {
+            $xp = $pdp->x;
+            $xpe = $pedp->x;
+            $xps = $psdp->x;
+        } else {
+            $xp = $xxp;
+            $xpe = $xxe;
+            $xps = $xxs;
+        }
+        if ($do_save || $ipli == SweConst::SEI_EARTH || isset($xperet) || ($ipli == SweConst::SEI_MOON))
+            $do_earth = true;
+        if ($do_save || $ipli == SweConst::SEI_SUNBARY || isset($xpsret) || ($ipli == SweConst::SEI_MOON))
+            $do_sunbary = true;
+        if ($ipli == SweConst::SEI_MOON)
+            $ictr = SweJPL::J_EARTH;
+        // open ephemeris, if still closed
+        if (!$this->parent->getSwePhp()->swed->jpl_file_is_open) {
+            $retc = $this->open_jpl_file($ss, $this->parent->getSwePhp()->swed->jplfnam,
+                $this->parent->getSwePhp()->swed->ephepath, $serr);
+            if ($retc != SweConst::OK)
+                return $retc;
+        }
+        if ($do_earth) {
+            // barycentric earth
+            if ($tjd != $pedp->teval || $tjd == 0) {
+                $retc = $this->swi_pleph($tjd, SweJPL::J_EARTH, SweJPL::J_SBARY, $xpe, $serr);
+                if ($do_save) {
+                    $pedp->teval = $tjd;
+                    $pedp->xflgs = -1;      // new light-time etc. required
+                    $pedp->iephe = SweConst::SEFLG_JPLEPH;
+                }
+                if ($retc != SweConst::OK) {
+                    $this->swi_close_jpl_file();
+                    $this->parent->getSwePhp()->swed->jpl_file_is_open = false;
+                    return $retc;
+                }
+            } else {
+                $xpe = $pedp->x;
+            }
+            if (isset($xperet))
+                for ($i = 0; $i <= 5; $i++)
+                    $xperet[$i] = $xpe[$i];
+        }
+        if ($do_sunbary) {
+            // barycentric sun
+            if ($tjd != $psdp->teval || $tjd == 0) {
+                $retc = $this->swi_pleph($tjd, SweJPL::J_SUN, SweJPL::J_SBARY, $xps, $serr);
+                if ($do_save) {
+                    $psdp->teval = $tjd;
+                    $psdp->xflgs = -1;
+                    $psdp->iephe = SweConst::SEFLG_JPLEPH;
+                }
+                if ($retc != SweConst::OK) {
+                    $this->swi_close_jpl_file();
+                    $this->parent->getSwePhp()->swed->jpl_file_is_open = false;
+                    return $retc;
+                }
+            } else {
+                $xps = $psdp->x;
+            }
+            if (isset($xpsret))
+                for ($i == 0; $i <= 5; $i++)
+                    $xpret[$i] = $xps[$i];
+        }
+        // earth is wanted
+        if ($ipli == SweConst::SEI_EARTH) {
+            for ($i = 0; $i <= 5; $i++)
+                $xp[$i] = $xpe[$i];
+        }
+        // sunbary is wanted
+        if ($ipli == SweConst::SEI_SUNBARY) {
+            for ($i = 0; $i <= 5; $i++)
+                $xp[$i] = $xps[$i];
+        } else {
+            // other planet
+            // if planet already computed
+            if ($tjd == $pdp->teval && $pdp->iephe == SweConst::SEFLG_JPLEPH) {
+                $xp = $pdp->x;
+            } else {
+                $retc = $this->swi_pleph($tjd, self::pnoint2jpl[$ipli], $ictr, $xp, $serr);
+                if ($do_save) {
+                    $pdp->teval = $tjd;
+                    $pdp->xflgs = -1;
+                    $pdp->iephe = SweConst::SEFLG_JPLEPH;
+                }
+                if ($retc != SweConst::OK) {
+                    $this->swi_close_jpl_file();
+                    $this->parent->getSwePhp()->swed->jpl_file_is_open = false;
+                    return $retc;
+                }
+            }
+        }
+        if (isset($xpret))
+            for ($i = 0; $i <= 5; $i++)
+                $xpret[$i] = $xp[$i];
+        return SweConst::OK;
+    }
+
+    /*
+     * this function looks for an ephemeris file,
+     * opens it, if not yet open,
+     * reads constants, if not yet read,
+     * computes a planet, if not yet computed
+     * attention: asteroids are heliocentric
+     *            other planets barycentric
+     *
+     * tjd 		julian date
+     * ipli		SEI_ planet number
+     * ifno		ephemeris file number
+     * xsunb	INPUT (!) array of 6 doubles containing barycentric sun
+     *              (must be given with asteroids)
+     * do_save	boolean: save result in save area
+     * xp		return array of 6 doubles for planet's position
+     * serr		error string
+     */
+    function sweph(float $tjd, int $ipli, int $ifno, int $iflag, ?array $xsunb,
+                   bool  $do_save, ?array &$xpret = null, ?string &$serr = null): int
+    {
+        $fname = '';
+        $xx = [];
+        $pedp =& $this->parent->getSwePhp()->swed->pldat[SweConst::SEI_EARTH];
+        $psdp =& $this->parent->getSwePhp()->swed->pldat[SweConst::SEI_SUNBARY];
+        $fdp =& $this->parent->getSwePhp()->swed->fidat[$ifno];
+        $ipl = $ipli;
+        if ($ipli > Sweph::SE_AST_OFFSET)
+            $ipl = SweConst::SEI_ANYBODY;
+        if ($ipli > Sweph::SE_PLMOON_OFFSET)
+            $ipl = SweConst::SEI_ANYBODY;
+        $pdp =& $this->parent->getSwePhp()->swed->pldat[$ipl];
+        if ($do_save) {
+            $xp = $pdp->x;
+        } else {
+            $xp = $xx;
+        }
+        // if planet has already been computed for this date, return.
+        // if speed flag has been turned on, recompute planet
+        $speedf1 = $pdp->xflgs & SweConst::SEFLG_SPEED;
+        $speedf2 = $iflag & SweConst::SEFLG_SPEED;
+        if ($tjd == $pdp->teval &&
+            $pdp->iephe == SweConst::SEFLG_SWIEPH &&
+            (!$speedf2 || $speedf1) &&
+            $ipl < SweConst::SEI_ANYBODY) {
+            if (isset($xpret))
+                for ($i = 0; $i <= 5; $i++)
+                    $xpret[$i] = $pdp->x[$i];
+            return SweConst::OK;
+        }
+        /******************************
+         * get correct ephemeris file *
+         ******************************/
+        if ($fdp->fptr != null) {
+            // if tjd is beyond file range, close old file.
+            // if new asteroid, close old file.
+            if ($tjd < $fdp->tfstart || $tjd > $fdp->tfend ||
+                ($ipl == SweConst::SEI_ANYBODY && $ipli != $pdp->ibdy)) {
+                fclose($fdp->fptr);
+                $fdp->fptr = null;
+                if ($pdp->refep != null)
+                    unset($pdp->refep);
+                $pdp->refep = null;
+                if ($pdp->segp != null)
+                    unset($pdp->segp);
+                $pdp->segp = null;
+            }
+        }
+        // if sweph file not open, find and open it
+        if ($fdp->fptr == null) {
+            $this->parent->getSwePhp()->swephLib->swi_gen_filename($tjd, $ipli, $fname);
+            $subdirnam = $fname;
+            $sp = strrchr($subdirnam, DIRECTORY_SEPARATOR);
+            if ($sp != null) {
+                $sp = '';
+                $subdirlen = strlen($subdirnam);
+            } else {
+                $subdirlen = 0;
+            }
+            $s = $fname;
+            again:
+            $fdp->fptr = $this->parent->swi_fopen($ifno, $s, $this->parent->getSwePhp()->swed->ephepath, $serr);
+            if ($fdp->fptr != null) {
+                // if it is a planetary moon, also try without the direction "sat/"
+                if ($ipli > Sweph::SE_PLMOON_OFFSET && $ipli < Sweph::SE_AST_OFFSET) {
+                    if ($subdirlen > 0 && strncmp($s, $subdirnam, $subdirlen) == 0) {
+                        $s = substr($s, $subdirlen + 1);
+                        goto again;
+                    }
+                    //
+                    // if it is a numbered asteroid file, try also for short files (..s.se1)
+                    // On the second try, the inserted 's' will be seen and not tried again.
+                    //
+                } else if ($ipli > Sweph::SE_AST_OFFSET) {
+                    $spp = strchr($s, '.');
+                    if ($spp > $s && $spp[strlen($spp) - 1] != 's') { // no 's' before '.' ?
+                        $spp = sprintf("s.%s", SweConst::SE_FILE_SUFFIX);
+                        goto again;
+                    }
+                    //
+                    // if we still have 'ast0' etc. in front of the filename,
+                    // we remove it now, remove the 's' also,
+                    // and try in the main ephemeris directory instead of the
+                    // asteroid subdirectory.
+                    //
+                    $spp = substr($spp, 0, strlen($spp) - 1);
+                    $spp = substr($spp, 1);
+                    if ($subdirlen > 0 && strncmp($s, $subdirnam, $subdirlen) == 0) {
+                        $s = substr($s, $subdirlen + 1); // remove "ast0/" etc.
+                        goto again;
+                    }
+                }
+                return SweConst::NOT_AVAILABLE;
+            }
+            // during the search error messages may have been built, delete them
+            if (isset($serr)) $serr = "";
+            $retc = $this->read_const($ifno, $serr);
+            if ($retc != SweConst::OK)
+                return $retc;
+        }
+        // if first ephemeris file (J-3000), it might start a mars period
+        // after -3000. if last ephemeris file (J3000), it might end a
+        // 4000-day-period before 3000.
+        if ($tjd < $fdp->tfstart || $tjd > $fdp->tfend) {
+            if (isset($serr)) {
+                $sp = strrchr($fname, DIRECTORY_SEPARATOR);
+                if ($sp != null) {
+                    $sp = substr($s, 1);
+                } else {
+                    $sp = $fname;
+                }
+                if ($ipli > Sweph::SE_AST_OFFSET) {
+                    $s = sprintf("asteroid No. %d (%s): ", $ipl - Sweph::SE_AST_OFFSET, $sp);
+                } else if ($ipli > Sweph::SE_PLMOON_OFFSET) {
+                    if (strstr($fname, "99.") != null)
+                        $s = sprintf("plan. COB No. %d (%s): ", $ipli, $sp);
+                    else
+                        $s = sprintf("plan. moon No. %d (%s): ", $ipli, $sp);
+                } else if ($ipli > SweConst::SEI_PLUTO) {
+                    $s = sprintf("asteroid eph. file (%s): ", $sp);
+                } else if ($ipli != SweConst::SEI_MOON) {
+                    $s = sprintf("planets eph. file (%s): ", $sp);
+                } else {
+                    $s = sprintf("moon eph. file (%s): ", $sp);
+                }
+                if ($tjd < $fdp->tfstart) {
+                    $s .= sprintf("jd %f < lower limit %f;", $tjd, $fdp->tfstart);
+                } else {
+                    $s .= sprintf("jd %f > upper limit %f;", $tjd, $fdp->tfend);
+                }
+            }
+            return SweConst::NOT_AVAILABLE;
+        }
+        /******************************
+         * get planet's position
+         ******************************/
+        // get new segment, if necessary
+        if ($pdp->segp == null || $tjd < $pdp->tseg0 || $tjd > $pdp->tseg1) {
+            $retc = $this->get_new_segment($tjd, $ipl, $ifno, $serr);
+            if ($retc != SweConst::OK)
+                return $retc;
+            // rotate cheby coeffs back to equatorial system.
+            // if necessary, add reference orbit.
+            if ($pdp->iflg & SweConst::SEI_FLG_ROTATE) {
+                $this->rot_back($ipl);
+            } else {
+                $pdp->neval = $pdp->ncoe;
+            }
+        }
+        // evaluate chebyshev polynomial for tjd
+        $t = ($tjd - $pdp->tseg0) / $pdp->dseg;
+        $t = $t * 2 - 1;
+        // speed is needed, if
+        // 1. true position is being computed before applying light-time etc.
+        //    this is the position saved in pdp->x.
+        //    in this case, speed is needed for light-time correction.
+        // 2. the speed flag has been specified.
+        //
+        $need_speed = ($do_save || ($ifno & SweConst::SEFLG_SPEED));
+        for ($i = 0; $i <= 2; $i++) {
+            $xp[$i] = $this->parent->getSwePhp()->swephLib->swi_echeb($t,
+                array_slice($pdp->segp, $i * $pdp->ncoe, $pdp->neval), $pdp->neval);
+            if ($need_speed) {
+                $xp[$i + 3] = $this->parent->getSwePhp()->swephLib->swi_edcheb($t,
+                        array_slice($pdp->segp, $i * $pdp->ncoe, $pdp->neval),
+                        $pdp->neval) / $pdp->dseg * 2;
+            } else {
+                $xp[$i + 3] = 0;        // vol Alois als billiger fix, evtl. illegal
+            }
+        }
+        // if planet wanted in barycentric sun:
+        // current sepl* files have do not have barycentric sun,
+        // but have heliocentric earth and barycentric earth.
+        // So barycentric sun and must be computed
+        // from heliocentric earth and barycentric earth: the
+        // computation above gives heliocentric earth, therefore we
+        // have to compute barycentric earth and subtract heliocentric
+        // earth from it. this may be necessary with calls from
+        // sweplan() and from app_pos_etc_sun() (light-time).
+        if ($ipl == SweConst::SEI_SUNBARY && ($pdp->iflg & SweConst::SEI_FLG_EMBHEL)) {
+            // sweph() calls sweph() !!! for EMB.
+            // Attention: a new calculation must be forced in any case.
+            // Otherwise EARTH (instead of EMB) will possibly takes from
+            // save area.
+            // to force new computation, set pedp->teval = 0 and restore it
+            // after call of sweph(EMB).
+            $tsv = $pedp->teval;
+            $pedp->teval = 0;
+            $retc = $this->sweph($tjd, SweConst::SEI_EMB, $ifno, $iflag | SweConst::SEFLG_SPEED, null, false, $xemb, $serr);
+            if ($retc != SweConst::OK)
+                return $retc;
+            $pedp->teval = $tsv;
+            for ($i = 0; $i <= 2; $i++)
+                $xp[$i] = $xemb[$i] - $xp[$i];
+            if ($need_speed)
+                for ($i = 3; $i <= 5; $i++)
+                    $xp[$i] = $xemb[$i] - $xp[$i];
+        }
+        // asteroids are heliocentric.
+        // if JPL or SWISSEPH, convert to barycentric
+        if (isset($xsunb) != null && (($iflag & SweConst::SEFLG_JPLEPH) || ($iflag & SweConst::SEFLG_SWIEPH))) {
+            if ($ipl >= SweConst::SEI_ANYBODY) {
+                for ($i = 0; $i <= 2; $i++)
+                    $xp[$i] += $xsunb[$i];
+                if ($need_speed)
+                    for ($i = 3; $i <= 5; $i++)
+                        $xp[$i] += $xsunb[$i];
+            }
+        }
+        if ($do_save) {
+            $pdp->teval = $tjd;
+            $pdp->xflgs = -1;       // do new computation of light-time etc.
+            if ($ifno == SweConst::SEI_FILE_PLANET || $ifno == SweConst::SEI_FILE_MOON) {
+                $pdp->iephe = SweConst::SEFLG_SWIEPH;
+            } else {
+                $pdp->iephe = $psdp->iephe;
+            }
+        }
+        if (isset($xpret))
+            for ($i = 0; $i <= 5; $i++)
+                $xpret[$i] = $xp[$i];
+        return SweConst::OK;
     }
 }
