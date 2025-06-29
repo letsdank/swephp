@@ -751,7 +751,7 @@ class swephlib_deltat
         return $iflag;
     }
 
-    private function swi_set_tid_acc(float $tjd_ut, int $iflag, int $denum, ?string &$serr = null): int
+    function swi_set_tid_acc(float $tjd_ut, int $iflag, int $denum, ?string &$serr = null): int
     {
         $retc = $iflag;
         $denumret = 0;

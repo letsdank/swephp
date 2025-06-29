@@ -128,8 +128,7 @@ class sweph_calc
             $iflag &= ~SweConst::SEFLG_CENTER_BODY;
         }
         if (($iflag & SweConst::SEFLG_CENTER_BODY) || $iplmoon > 0) {
-            // TODO:
-            //  $this->swi_force_app_pos_etc();
+            $this->swi_force_app_pos_etc();
         }
         // pointer to save area
         if ($ipl < SwePlanet::count() && $ipl >= SwePlanet::SUN->value) {
@@ -315,7 +314,7 @@ class sweph_calc
             return SweConst::ERR;
         }
         if ($epheflag != SweConst::SEFLG_MOSEPH && !$this->parent->getSwePhp()->swed->ephe_path_is_set && !$this->parent->getSwePhp()->swed->jpl_file_is_open)
-            $this->parent->swe_set_ephe_path(NULL); // TODO
+            $this->parent->swe_set_ephe_path(NULL);
         if (($iflag & SweConst::SEFLG_SIDEREAL) && !$this->parent->getSwePhp()->swed->ayana_is_set)
             $this->parent->swe_set_sid_mode(SweSiderealMode::SIDM_FAGAN_BRADLEY, 0, 0);
         /////////////////////////////////////////////////////
@@ -817,18 +816,19 @@ class sweph_calc
 
     function free_planets(): void
     {
+        $swed =& $this->parent->getSwePhp()->swed;
         // free planets data space
         for ($i = 0; $i < SweConst::SEI_NPLANETS; $i++) {
-            if ($this->parent->getSwePhp()->swed->pldat[$i]->segp != null)
-                unset($this->parent->getSwePhp()->swed->pldat[$i]->segp);
-            if ($this->parent->getSwePhp()->swed->pldat[$i]->refep != null)
-                unset($this->parent->getSwePhp()->swed->pldat[$i]->refep);
-            $this->parent->getSwePhp()->swed->pldat[$i] = new plan_data();
+            if (($swed->pldat[$i]->segp ?? null) != null)
+                unset($swed->pldat[$i]->segp);
+            if (($swed->pldat[$i]->refep ?? null) != null)
+                unset($swed->pldat[$i]->refep);
+            $swed->pldat[$i] = new plan_data();
         }
         for ($i = 0; $i <= SweConst::SEI_NPLANETS; $i++) // "<=" is correct! see decl.
-            $this->parent->getSwePhp()->swed->savedat[$i] = new save_positions();
+            $swed->savedat[$i] = new save_positions();
         // clean node data space
         for ($i = 0; $i < SweConst::SEI_NNODE_ETC; $i++)
-            $this->parent->getSwePhp()->swed->nddat[$i] = new plan_data();
+            $swed->nddat[$i] = new plan_data();
     }
 }

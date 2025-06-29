@@ -1,9 +1,14 @@
 <?php
 
+use Enums\SweModel;
 use Enums\SwePlanet;
 use Enums\SweTidalAccel;
+use Structs\epsilon;
 use Structs\file_data;
+use Structs\nut;
+use Structs\sid_data;
 use Structs\swe_data;
+use Structs\topo_data;
 
 class Sweph extends SweModule
 {
@@ -116,6 +121,137 @@ class Sweph extends SweModule
             return 1;
         }
         return 0;
+    }
+
+    // closes all open files, frees space of planetary data,
+    // deletes memory of all computed positions
+    //
+    function swi_close_keep_topo_etc(): void
+    {
+        $swed =& $this->swePhp->swed;
+        // closs SWISSEPH files
+        for ($i = 0; $i < Sweph::SEI_NEPHFILES; $i++) {
+            if (($swed->fidat[$i]?->fptr ?? null) != null)
+                fclose($swed->fidat[$i]->fptr);
+            $swed->fidat[$i] = new file_data();
+        }
+        $this->calc->free_planets();
+        $swed->oec = new epsilon();
+        $swed->oec2000 = new epsilon();
+        $swed->nut = new nut();
+        $swed->nut2000 = new nut();
+        $swed->nutv = new nut();
+        $swed->astro_models = array_fill(0, SweModel::count(), 0);
+        // close JPL file
+        // TODO
+        // $this->swi_close_jpl_file();
+        $swed->jpl_file_is_open = false;
+        $swed->jpldenum = 0;
+        // close fixed stars
+        if ($swed->fixfp != null) {
+            fclose($swed->fixfp);
+            $swed->fixfp = null;
+        }
+        $this->swePhp->swephLib->swe_set_tid_acc(SweTidalAccel::SE_TIDAL_AUTOMATIC);
+        $swed->is_old_starfile = false;
+        $swed->i_saved_planet_name = 0;
+        $swed->saved_planet_name = "";
+        $swed->timeout = 0;
+    }
+
+    // closes all open files, frees space of planetary data,
+    // deletes memory of all computed positions
+    public function swe_close(): void
+    {
+        $swed =& $this->swePhp->swed;
+        // close SWISSEPH files
+        for ($i = 0; $i < Sweph::SEI_NEPHFILES; $i++) {
+            if ($swed->fidat[$i]->fptr != null)
+                fclose($swed->fidat[$i]->fptr);
+            $swed->fidat[$i] = new file_data();
+        }
+        $this->calc->free_planets();
+        $swed->oec = new epsilon();
+        $swed->oec2000 = new epsilon();
+        $swed->nut = new nut();
+        $swed->nut2000 = new nut();
+        $swed->nutv = new nut();
+        $swed->astro_models = array_fill(0, SweModel::count(), 0);
+        // closes JPL file
+        $swed->jpl_file_is_open = false;
+        $swed->jpldenum = 0;
+        // close fixed stars
+        if ($swed->fixfp != null) {
+            fclose($swed->fixfp);
+            $swed->fixfp = null;
+        }
+        $this->swePhp->swephLib->swe_set_tid_acc(SweTidalAccel::SE_TIDAL_AUTOMATIC);
+        $swed->geopos_is_set = false;
+        $swed->ayana_is_set = false;
+        $swed->is_old_starfile = false;
+        $swed->i_saved_planet_name = 0;
+        $swed->saved_planet_name = '';
+        $swed->topd = new topo_data();
+        $swed->sidd = new sid_data();
+        $swed->timeout = 0;
+        $swed->last_epheflag = 0;
+        if ($swed->dpsi != null) {
+            unset($swed->dpsi);
+            $swed->dpsi = null;
+        }
+        if ($swed->deps != null) {
+            unset($swed->deps);
+            $swed->deps = null;
+        }
+        if ($swed->n_fixstars_records > 0) {
+            unset($swed->fixed_stars);
+            $swed->fixed_stars = null;
+            $swed->n_fixstars_real = 0;
+            $swed->n_fixstars_named = 0;
+            $swed->n_fixstars_records = 0;
+        }
+        if (SweInternalParams::TRACE) {
+            // TODO: Trace
+        }
+    }
+
+    // sets ephemeris file path.
+    // also calls swe_close(). this makes sure that swe_calc()
+    // won't return planet positions previously computed from other
+    // ephemerides
+    //
+    public function swe_set_ephe_path(?string $path): void
+    {
+        $xx = [];
+        $swed = &$this->swePhp->swed;
+        // close all open files and delete all planetary data
+        $this->swi_close_keep_topo_etc();
+        $this->swi_init_swed_if_start();
+        $swed->ephe_path_is_set = true;
+        // environment variable SE_EPHE_PATH has priority
+        if (($sp = getenv("SE_EPHE_PATH")) != null
+            && strlen($sp) != 0) {
+            $s = $sp;
+        } else if (empty($path)) {
+            $s = "sweph/ephe";
+        } else {
+            $s = $path;
+        }
+        $i = strlen($s);
+        if ($s[$i - 1] != DIRECTORY_SEPARATOR && !empty($s))
+            $s .= DIRECTORY_SEPARATOR;
+        $swed->ephepath = $s;
+        // try to open lunar ephemeris, in order to get DE number and set
+        // tidal acceleration of the Moon
+        $iflag = SweConst::SEFLG_SWIEPH | SweConst::SEFLG_J2000 | SweConst::SEFLG_TRUEPOS | SweConst::SEFLG_ICRS;
+        $swed->last_epheflag = 2;
+        $this->swe_calc(Sweph::J2000, SwePlanet::MOON->value, $iflag, $xx);
+        if ($swed->fidat[SweConst::SEI_FILE_MOON]->fptr != null) {
+            $this->swePhp->swephLib->swi_set_tid_acc(0, 0, $swed->fidat[SweConst::SEI_FILE_MOON]->sweph_denum);
+        }
+        if (SweInternalParams::TRACE) {
+            // TODO: Trace
+        }
     }
 
     public function swi_fopen(int $ifno, string $fname, string $ephepath, ?string &$serr = null)

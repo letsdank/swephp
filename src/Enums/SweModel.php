@@ -12,4 +12,9 @@ enum SweModel: int
     case MODEL_JPLHOR_MODE = 5;
     case MODEL_JPLHORA_MODE = 6;
     case MODEL_SIDT = 7;
+
+    public static function count(): int
+    {
+        return 8; // TODO: Dynamic?
+    }
 }

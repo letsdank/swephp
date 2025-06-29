@@ -10,6 +10,7 @@ class swe_data
 
     public bool $ephe_path_is_set = false;
     public bool $jpl_file_is_open = false;
+    public $fixfp;      // fixed stars file pointer
     public string $ephepath = "";
     public string $jplfnam = "";
     public int $jpldenum = 0;
@@ -46,11 +47,27 @@ class swe_data
     public array $pldat = [];
     public array $nddat = [];
     public array $savedat = [];
+    public epsilon $oec;
+    public epsilon $oec2000;
+    public nut $nut;
+    public nut $nut2000;
+    public nut $nutv;
+    public topo_data $topd;
     public sid_data $sidd;
+    public int $n_fixstars_real; // real number of fixed stars in sefstars.txt
+    public int $n_fixstars_named; // number of fixed stars with traditional name
+    public int $n_fixstars_records; // number of fixed stars with records in fixed_stars
+    public ?array $fixed_stars = [];
 
     public function __construct()
     {
         $this->interpol = new interpol();
+        $this->oec = new epsilon();
+        $this->oec2000 = new epsilon();
+        $this->nut = new nut();
+        $this->nut2000 = new nut();
+        $this->nutv = new nut();
+        $this->topd = new topo_data();
         $this->sidd = new sid_data();
     }
 }

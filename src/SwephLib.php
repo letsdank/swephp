@@ -725,4 +725,10 @@ class SwephLib extends SweModule
     {
         return $this->nut->swi_nutation($tjd, $iflag, $nutlo);
     }
+
+    // deltat
+    function swi_set_tid_acc(float $tjd_ut, int $iflag, int $denum, ?string &$serr = null): int
+    {
+        return $this->deltat->swi_set_tid_acc($tjd_ut, $iflag, $denum, $serr);
+    }
 }
