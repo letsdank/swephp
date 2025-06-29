@@ -9,8 +9,7 @@ class SweGetTidAccTest extends SweTestCase
     public function __construct()
     {
         parent::__construct();
-        // TODO: Need to implement swe_set_ephe_path() to bring this test to work
-        // $this->swe->swephLib->swe_set_ephe_path();
+        $this->swe->sweph->swe_set_ephe_path(null);
     }
 
     public function test_01()
