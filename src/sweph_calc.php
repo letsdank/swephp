@@ -91,7 +91,7 @@ class sweph_calc
             // close and free ephemeris files
             if ($ipl != SwePlanet::ECL_NUT->value) { // because file will not be reopened with this jpl
                 if ($this->parent->getSwePhp()->swed->jpl_file_is_open) {
-                    $this->swi_close_jpl_file();
+                    $this->parent->getSwePhp()->sweJPL->swi_close_jpl_file();
                     $this->parent->getSwePhp()->swed->jpl_file_is_open = false;
                 }
                 for ($i = 0; $i < Sweph::SEI_NEPHFILES; $i++) {
@@ -442,9 +442,9 @@ class sweph_calc
                         if ($retc != SweConst::OK)
                             goto sweph_sbar;
                     }
-                    $retc = $this->swi_pleph($tjd, SweJPL::J_SUN, SweJPL::J_SBARY, $psdp->x, $serr);
+                    $retc = $this->parent->getSwePhp()->sweJPL->swi_pleph($tjd, SweJPL::J_SUN, SweJPL::J_SBARY, $psdp->x, $serr);
                     if ($retc == SweConst::ERR || $retc == SweConst::BEYOND_EPH_LIMITS) {
-                        $this->swi_close_jpl_file();
+                        $this->parent->getSwePhp()->sweJPL->swi_close_jpl_file();
                         $this->parent->getSwePhp()->swed->jpl_file_is_open = false;
                         goto return_error;
                     }
@@ -1340,14 +1340,14 @@ class sweph_calc
         if ($do_earth) {
             // barycentric earth
             if ($tjd != $pedp->teval || $tjd == 0) {
-                $retc = $this->swi_pleph($tjd, SweJPL::J_EARTH, SweJPL::J_SBARY, $xpe, $serr);
+                $retc = $this->parent->getSwePhp()->sweJPL->swi_pleph($tjd, SweJPL::J_EARTH, SweJPL::J_SBARY, $xpe, $serr);
                 if ($do_save) {
                     $pedp->teval = $tjd;
                     $pedp->xflgs = -1;      // new light-time etc. required
                     $pedp->iephe = SweConst::SEFLG_JPLEPH;
                 }
                 if ($retc != SweConst::OK) {
-                    $this->swi_close_jpl_file();
+                    $this->parent->getSwePhp()->sweJPL->swi_close_jpl_file();
                     $this->parent->getSwePhp()->swed->jpl_file_is_open = false;
                     return $retc;
                 }
@@ -1361,14 +1361,14 @@ class sweph_calc
         if ($do_sunbary) {
             // barycentric sun
             if ($tjd != $psdp->teval || $tjd == 0) {
-                $retc = $this->swi_pleph($tjd, SweJPL::J_SUN, SweJPL::J_SBARY, $xps, $serr);
+                $retc = $this->parent->getSwePhp()->sweJPL->swi_pleph($tjd, SweJPL::J_SUN, SweJPL::J_SBARY, $xps, $serr);
                 if ($do_save) {
                     $psdp->teval = $tjd;
                     $psdp->xflgs = -1;
                     $psdp->iephe = SweConst::SEFLG_JPLEPH;
                 }
                 if ($retc != SweConst::OK) {
-                    $this->swi_close_jpl_file();
+                    $this->parent->getSwePhp()->sweJPL->swi_close_jpl_file();
                     $this->parent->getSwePhp()->swed->jpl_file_is_open = false;
                     return $retc;
                 }
@@ -1394,14 +1394,14 @@ class sweph_calc
             if ($tjd == $pdp->teval && $pdp->iephe == SweConst::SEFLG_JPLEPH) {
                 $xp = $pdp->x;
             } else {
-                $retc = $this->swi_pleph($tjd, self::pnoint2jpl[$ipli], $ictr, $xp, $serr);
+                $retc = $this->parent->getSwePhp()->sweJPL->swi_pleph($tjd, self::pnoint2jpl[$ipli], $ictr, $xp, $serr);
                 if ($do_save) {
                     $pdp->teval = $tjd;
                     $pdp->xflgs = -1;
                     $pdp->iephe = SweConst::SEFLG_JPLEPH;
                 }
                 if ($retc != SweConst::OK) {
-                    $this->swi_close_jpl_file();
+                    $this->parent->getSwePhp()->sweJPL->swi_close_jpl_file();
                     $this->parent->getSwePhp()->swed->jpl_file_is_open = false;
                     return $retc;
                 }
@@ -1828,16 +1828,16 @@ class sweph_calc
                     else
                         $ipl = self::pnoint2jpl[$ipli];
                     if ($ibody == self::IS_PLANET) {
-                        $retc = $this->swi_pleph($t, $ipl, SweJPL::J_SBARY, $xx, $serr);
+                        $retc = $this->parent->getSwePhp()->sweJPL->swi_pleph($t, $ipl, SweJPL::J_SBARY, $xx, $serr);
                         if ($retc != SweConst::OK) {
-                            $this->swi_close_jpl_file();
+                            $this->parent->getSwePhp()->sweJPL->swi_close_jpl_file();
                             $this->parent->getSwePhp()->swed->jpl_file_is_open = false;
                         }
                     } else {        // asteroid
                         // first sun
-                        $retc = $this->swi_pleph($t, SweJPL::J_SUN, SweJPL::J_SBARY, $xsun, $serr);
+                        $retc = $this->parent->getSwePhp()->sweJPL->swi_pleph($t, SweJPL::J_SUN, SweJPL::J_SBARY, $xsun, $serr);
                         if ($retc != SweConst::OK) {
-                            $this->swi_close_jpl_file();
+                            $this->parent->getSwePhp()->sweJPL->swi_close_jpl_file();
                             $this->parent->getSwePhp()->swed->jpl_file_is_open = false;
                         }
                         // asteroid
@@ -1848,9 +1848,9 @@ class sweph_calc
                     // for accuracy in speed, we need earth as well
                     if (($iflag & SweConst::SEFLG_SPEED) &&
                         !($iflag & SweConst::SEFLG_HELCTR) && !($iflag & SweConst::SEFLG_BARYCTR)) {
-                        $retc = $this->swi_pleph($t, SweJPL::J_EARTH, SweJPL::J_SBARY, $xearth, $serr);
+                        $retc = $this->parent->getSwePhp()->sweJPL->swi_pleph($t, SweJPL::J_EARTH, SweJPL::J_SBARY, $xearth, $serr);
                         if ($retc != SweConst::OK) {
-                            $this->swi_close_jpl_file();
+                            $this->parent->getSwePhp()->sweJPL->swi_close_jpl_file();
                             $this->parent->getSwePhp()->swed->jpl_file_is_open = false;
                             return $retc;
                         }
@@ -3085,11 +3085,11 @@ class sweph_calc
                         // if heliocentric or barycentric earth, new earth at t'
                         case SweConst::SEFLG_JPLEPH:
                             if (($iflag & SweConst::SEFLG_HELCTR) || ($iflag & SweConst::SEFLG_BARYCTR))
-                                $retc = $this->swi_pleph($t, SweJPL::J_EARTH, SweJPL::J_SBARY, $xearth, $serr);
+                                $retc = $this->parent->getSwePhp()->sweJPL->swi_pleph($t, SweJPL::J_EARTH, SweJPL::J_SBARY, $xearth, $serr);
                             else
-                                $retc = $this->swi_pleph($t, SweJPL::J_SUN, SweJPL::J_SBARY, $xsun, $serr);
+                                $retc = $this->parent->getSwePhp()->sweJPL->swi_pleph($t, SweJPL::J_SUN, SweJPL::J_SBARY, $xsun, $serr);
                             if ($retc != SweConst::OK) {
-                                $this->swi_close_jpl_file();
+                                $this->parent->getSwePhp()->sweJPL->swi_close_jpl_file();
                                 $this->parent->getSwePhp()->swed->jpl_file_is_open = false;
                                 return $retc;
                             }
@@ -3242,13 +3242,13 @@ class sweph_calc
             $t = $pdp->teval - $dt;
             switch ($pdp->iephe) {
                 case SweConst::SEFLG_JPLEPH:
-                    $retc = $this->swi_pleph($t, SweJPL::J_MARS, SweJPL::J_EARTH, $xx, $serr);
+                    $retc = $this->parent->getSwePhp()->sweJPL->swi_pleph($t, SweJPL::J_MARS, SweJPL::J_EARTH, $xx, $serr);
                     if ($retc == SweConst::OK)
-                        $retc = $this->swi_pleph($t, SweJPL::J_EARTH, SweJPL::J_SBARY, $xe, $serr);
+                        $retc = $this->parent->getSwePhp()->sweJPL->swi_pleph($t, SweJPL::J_EARTH, SweJPL::J_SBARY, $xe, $serr);
                     if ($retc == SweConst::OK && ($iflag & SweConst::SEFLG_HELCTR))
-                        $retc = $this->swi_pleph($t, SweJPL::J_SUN, SweJPL::J_SBARY, $xs, $serr);
+                        $retc = $this->parent->getSwePhp()->sweJPL->swi_pleph($t, SweJPL::J_SUN, SweJPL::J_SBARY, $xs, $serr);
                     if ($retc != SweConst::OK) {
-                        $this->swi_close_jpl_file();
+                        $this->parent->getSwePhp()->sweJPL->swi_close_jpl_file();
                         $this->parent->getSwePhp()->swed->jpl_file_is_open = false;
                     }
                     for ($i = 0; $i <= 5; $i++)

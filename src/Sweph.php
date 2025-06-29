@@ -414,8 +414,7 @@ class Sweph extends SweModule
         $swed->nutv = new nut();
         $swed->astro_models = array_fill(0, SweModel::count(), 0);
         // close JPL file
-        // TODO
-        // $this->swi_close_jpl_file();
+        $this->swePhp->sweJPL->swi_close_jpl_file();
         $swed->jpl_file_is_open = false;
         $swed->jpldenum = 0;
         // close fixed stars
