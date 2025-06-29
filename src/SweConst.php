@@ -7,6 +7,9 @@ class SweConst
     const int NOT_AVAILABLE = -2;
     const int BEYOND_EPH_LIMITS = -3;
 
+    const int J_TO_J2000 = 1;
+    const int J2000_TO_J = -1;
+
     const int AS_MAXCH = 256;
 
     // Mathematical constants
@@ -152,6 +155,23 @@ class SweConst
     const int SEFLG_CENTER_BODY = 0x00100000;
     // test raw data in files sepm9*
     const int SEFLG_TEST_PLMOON = 0x00200000 | self::SEFLG_J2000 | self::SEFLG_ICRS | self::SEFLG_HELCTR | self::SEFLG_TRUEPOS;
+
+    const int SE_SIDBITS = 256;
+    // for projection onto ecliptic of t0
+    const int SE_SIDBIT_ECL_T0 = 256;
+    // for projection onto solar system plane
+    const int SE_SIDBIT_SSY_PLANE = 512;
+    // with user-defined ayanamsha, t0 is UT
+    const int SE_SIDBIT_USER_UT = 1024;
+    // ayanamsha measured on ecliptic of date;
+    // see commentaries in Sweph:swi_get_ayanamsa_ex().
+    const int SE_SIDBIT_ECL_DATE = 2048;
+    // test feature: don't apply constant offset to ayanamsha
+    // see commentary above Sweph:get_aya_correction()
+    const int SE_SIDBIT_NO_PREC_OFFSET = 4096;
+    // test feature: calculate ayanamsha using its original precession model
+    const int SE_SIDBIT_PREC_ORIG = 8192;
+
 
     // default ephemeris used when no ephemeris flagbit is set
     const int SEFLG_DEFAULTEPH = self::SEFLG_SWIEPH;

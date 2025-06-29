@@ -52,4 +52,6 @@ enum SweSiderealMode: int
     case SE_SIDM_KRISHNAMURTI_VP291 = 45;
     case SE_SIDM_LAHIRI_ICRC = 46;
     case SE_SIDM_USER = 255; // user-defined ayanamsha, t0 is TT
+
+    const int SE_NSIDM_PREDEF = 47;
 }

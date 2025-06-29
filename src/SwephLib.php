@@ -698,14 +698,29 @@ class SwephLib extends SweModule
         $this->cotrans->swi_cartpol($x, $l);
     }
 
+    function swi_cartpol_sp(array $x, array &$l): void
+    {
+        $this->cotrans->swi_cartpol_sp($x, $l);
+    }
+
     function swi_polcart(array $l, array &$x): void
     {
         $this->cotrans->swi_polcart($l, $x);
     }
 
+    function swi_polcart_sp(array $l, array &$x): void
+    {
+        $this->cotrans->swi_polcart_sp($l, $x);
+    }
+
     function swi_coortrf(array $xpo, array &$xpn, float $eps): void
     {
         $this->cotrans->swi_coortrf($xpo, $xpn, $eps);
+    }
+
+    function swi_coortrf2(array $xpo, array &$xpn, float $sineps, float $coseps): void
+    {
+        $this->cotrans->swi_coortrf2($xpo, $xpn, $sineps, $coseps);
     }
 
     // precess
@@ -720,6 +735,11 @@ class SwephLib extends SweModule
         return $this->precess->swi_precess($R, $J, $iflag, $direction);
     }
 
+    function swi_ldp_peps(float $tjd, ?float &$dpre = null, ?float &$deps = null): void
+    {
+        $this->precess->swi_ldp_peps($tjd, $dpre, $deps);
+    }
+
     // nut
 
     function swi_nutation(float $tjd, int $iflag, array &$nutlo): int
@@ -731,5 +751,10 @@ class SwephLib extends SweModule
     function swi_set_tid_acc(float $tjd_ut, int $iflag, int $denum, ?string &$serr = null): int
     {
         return $this->deltat->swi_set_tid_acc($tjd_ut, $iflag, $denum, $serr);
+    }
+
+    function swi_guess_ephe_flag(): int
+    {
+        return $this->deltat->swi_guess_ephe_flag();
     }
 }
