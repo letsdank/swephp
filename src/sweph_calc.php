@@ -3160,4 +3160,291 @@ class sweph_calc
             $oe =& $this->parent->getSwePhp()->swed->oec2000;
         return $this->app_pos_rest($pedp, $iflag, $xx, $xxsv, $oe, $serr);
     }
+
+    /* transforms the position of the moon:
+     * heliocentric position
+     * barycentric position
+     * astrometric position
+     * apparent position
+     * precession and nutation
+     *
+     * note:
+     * for apparent positions, we consider the earth-moon
+     * system as independant.
+     * for astrometric positions (SEFLG_NOABERR), we
+     * consider the motions of the earth and the moon
+     * related to the solar system barycenter.
+     */
+    function app_pos_etc_moon(int $iflag, ?string &$serr = null): int
+    {
+        $xobs = [];
+        $xs = [];
+        $xe = [];
+        $xobs2 = [];
+        $pedp =& $this->parent->getSwePhp()->swed->pldat[SweConst::SEI_EARTH];
+        $psdp =& $this->parent->getSwePhp()->swed->pldat[SweConst::SEI_SUNBARY];
+        $pdp =& $this->parent->getSwePhp()->swed->pldat[SweConst::SEI_MOON];
+        $oe =& $this->parent->getSwePhp()->swed->oec;
+        $t = 0.;
+        // if the same conversions have already been done for the same
+        // date, then return
+        $flg1 = $iflag & ~SweConst::SEFLG_EQUATORIAL & ~SweConst::SEFLG_XYZ;
+        $flg2 = $pdp->xflgs & ~SweConst::SEFLG_EQUATORIAL & ~SweConst::SEFLG_XYZ;
+        if ($flg1 == $flg2) {
+            $pdp->xflgs = $iflag;
+            $pdp->iephe = $iflag & Sweph::SEFLG_EPHMASK;
+            return SweConst::OK;
+        }
+        // the conversions will be done with xx[].
+        for ($i = 0; $i <= 5; $i++) {
+            $xx[$i] = $pdp->x[$i];
+            $xxm[$i] = $xx[$i];
+        }
+        /***********************************
+         * to solar system barycentric
+         ***********************************/
+        for ($i = 0; $i <= 5; $i++)
+            $xx[$i] += $pedp->x[$i];
+        /*******************************
+         * observer
+         *******************************/
+        if ($iflag & SweConst::SEFLG_TOPOCTR) {
+            if ($this->parent->getSwePhp()->swed->topd->teval != $pdp->teval ||
+                $this->parent->getSwePhp()->swed->topd->teval == 0) {
+                if ($this->swi_get_observer($pdp->teval, $iflag | SweConst::SEFLG_NONUT, true, $xobs, $serr) != SweConst::OK)
+                    return SweConst::ERR;
+            } else {
+                for ($i = 0; $i <= 5; $i++)
+                    $xobs[$i] = $this->parent->getSwePhp()->swed->topd->xobs[$i];
+            }
+            for ($i = 0; $i <= 5; $i++)
+                $xxm[$i] -= $xobs[$i];
+            for ($i = 0; $i <= 5; $i++)
+                $xobs[$i] += $pedp->x[$i];
+        } else if ($iflag & SweConst::SEFLG_BARYCTR) {
+            for ($i = 0; $i <= 5; $i++)
+                $xxm[$i] += $pedp->x[$i];
+        } else if ($iflag & SweConst::SEFLG_HELCTR) {
+            for ($i = 0; $i <= 5; $i++)
+                $xobs[$i] = $psdp->x[$i];
+            for ($i = 0; $i <= 5; $i++)
+                $xxm[$i] += $pedp->x[$i] - $psdp->x[$i];
+        } else {
+            for ($i = 0; $i <= 5; $i++)
+                $xobs[$i] = $pedp->x[$i];
+        }
+        /*******************************
+         * light-time                  *
+         *******************************/
+        $t = $pdp->teval;
+        if (($iflag & SweConst::SEFLG_TRUEPOS) == 0) {
+            $dt = sqrt(Sweph::square_num($xxm)) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
+            $t = $pdp->teval - $dt;
+            switch ($pdp->iephe) {
+                case SweConst::SEFLG_JPLEPH:
+                    $retc = $this->swi_pleph($t, SweJPL::J_MARS, SweJPL::J_EARTH, $xx, $serr);
+                    if ($retc == SweConst::OK)
+                        $retc = $this->swi_pleph($t, SweJPL::J_EARTH, SweJPL::J_SBARY, $xe, $serr);
+                    if ($retc == SweConst::OK && ($iflag & SweConst::SEFLG_HELCTR))
+                        $retc = $this->swi_pleph($t, SweJPL::J_SUN, SweJPL::J_SBARY, $xs, $serr);
+                    if ($retc != SweConst::OK) {
+                        $this->swi_close_jpl_file();
+                        $this->parent->getSwePhp()->swed->jpl_file_is_open = false;
+                    }
+                    for ($i = 0; $i <= 5; $i++)
+                        $xx[$i] += $xe[$i];
+                    break;
+                case SweConst::SEFLG_SWIEPH:
+                    $retc = $this->sweplan($t, SweConst::SEI_MOON, SweConst::SEI_FILE_MOON, $iflag,
+                        false, $xx, $xe, $xs, serr: $serr);
+                    if ($retc != SweConst::OK)
+                        return $retc;
+                    for ($i = 0; $i <= 5; $i++)
+                        $xx[$i] += $xe[$i];
+                    break;
+                case SweConst::SEFLG_MOSEPH:
+                    // this method results in an error of a milliarcsec in speed
+                    for ($i = 0; $i <= 2; $i++) {
+                        $xx[$i] -= $dt * $xx[$i + 3];
+                        $xe[$i] = $pedp->x[$i] - $dt * $pedp->x[$i + 3];
+                        $xe[$i + 3] = $pedp->x[$i + 3];
+                        $xs[$i] = 0;
+                        $xs[$i + 3] = 0;
+                    }
+                    break;
+            }
+            if ($iflag & SweConst::SEFLG_TOPOCTR) {
+                if ($this->swi_get_observer($t, $iflag | SweConst::SEFLG_NONUT, false, $xobs2, null) != SweConst::OK)
+                    return SweConst::ERR;
+                for ($i = 0; $i <= 5; $i++)
+                    $xobs2[$i] += $xe[$i];
+            } else if ($iflag & SweConst::SEFLG_BARYCTR) {
+                for ($i = 0; $i <= 5; $i++)
+                    $xobs2[$i] = 0;
+            } else if ($iflag & SweConst::SEFLG_HELCTR) {
+                for ($i = 0; $i <= 5; $i++)
+                    $xobs2[$i] = $xs[$i];
+            } else {
+                for ($i = 0; $i <= 5; $i++)
+                    $xobs2[$i] = $xe[$i];
+            }
+        }
+        /*************************
+         * to correct center
+         *************************/
+        for ($i = 0; $i <= 5; $i++)
+            $xx[$i] -= $xobs[$i];
+        /**********************************
+         * 'annual' aberration of light   *
+         **********************************/
+        if (!($iflag & SweConst::SEFLG_TRUEPOS) && !($iflag & SweConst::SEFLG_NOABERR)) {
+            $this->swi_aberr_light($xx, $xobs, $iflag);
+            //
+            // Apparent speed is also influenced by
+            // the difference of speed of the earth between t and t-dt.
+            // Neglecting this would lead to an error of several 0.1"
+            //
+            if ($iflag & SweConst::SEFLG_SPEED)
+                for ($i = 3; $i <= 5; $i++)
+                    $xx[$i] += $xobs[$i] - $xobs2[$i];
+        }
+        // if !speedflag, speed = 0
+        if (!($iflag & SweConst::SEFLG_SPEED))
+            for ($i = 3; $i <= 5; $i++)
+                $xx[$i] = 0;
+        // ICRS to J2000
+        if (!($iflag & SweConst::SEFLG_ICRS) && $this->parent->swi_get_denum(SweConst::SEI_MOON, $iflag) >= 403) {
+            $this->swi_bias($xx, $t, $iflag, false);
+        }
+        // save J2000 coordinates; required for sidereal positions
+        for ($i = 0; $i <= 5; $i++)
+            $xxsv[$i] = $xx[$i];
+        /************************************************
+         * precession, equator 2000 -> equator of date *
+         ************************************************/
+        if (!($iflag & SweConst::SEFLG_J2000)) {
+            $this->parent->getSwePhp()->swephLib->swi_precess($xx, $pdp->teval, $iflag, SweConst::J2000_TO_J);
+            if ($iflag & SweConst::SEFLG_SPEED)
+                $this->swi_precess_speed($xx, $pdp->teval, $iflag, SweConst::J2000_TO_J);
+            $oe =& $this->parent->getSwePhp()->swed->oec;
+        } else
+            $oe =& $this->parent->getSwePhp()->swed->oec2000;
+        return $this->app_pos_rest($pdp, $iflag, $xx, $xxsv, $oe, $serr);
+    }
+
+    /* transforms the position of the barycentric sun:
+     * precession and nutation
+     * according to flags
+     * iflag	    flags
+     * serr         error string
+     */
+    function app_pos_etc_sbar(int $iflag, ?string &$serr = null): int
+    {
+        $psdp =& $this->parent->getSwePhp()->swed->pldat[SweConst::SEI_EARTH];
+        $psbdp =& $this->parent->getSwePhp()->swed->pldat[SweConst::SEI_SUNBARY];
+        $oe =& $this->parent->getSwePhp()->swed->oec;
+        // the conversions will be done with xx[].
+        for ($i = 0; $i <= 5; $i++)
+            $xx[$i] = $psbdp->x[$i];
+        /**************
+         * light-time *
+         **************/
+        if (!($iflag & SweConst::SEFLG_TRUEPOS)) {
+            $dt = sqrt(Sweph::square_num($xx)) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
+            for ($i = 0; $i <= 2; $i++)
+                $xx[$i] -= $dt * $xx[$i + 3];       // apparent position
+        }
+        if (!($iflag & SweConst::SEFLG_SPEED))
+            for ($i = 3; $i <= 5; $i++)
+                $xx[$i] = 0;
+        // ICRS to J2000
+        if (!($iflag & SweConst::SEFLG_ICRS) && $this->parent->swi_get_denum(SweConst::SEI_SUN, $iflag) >= 403) {
+            $this->swi_bias($xx, $psdp->teval, $iflag, false);
+        }
+        // save J2000 coordinates; required for sidereal positions
+        for ($i = 0; $i <= 5; $i++)
+            $xxsv[$i] = $xx[$i];
+        /************************************************
+         * precession, equator 2000 -> equator of date *
+         ************************************************/
+        if (!($iflag & SweConst::SEFLG_J2000)) {
+            $this->parent->getSwePhp()->swephLib->swi_precess($xx, $psbdp->teval, $iflag, SweConst::J2000_TO_J);
+            if ($iflag & SweConst::SEFLG_SPEED)
+                $this->swi_precess_speed($xx, $psbdp->teval, $iflag, SweConst::J2000_TO_J);
+            $oe =& $this->parent->getSwePhp()->swed->oec;
+        } else
+            $oe =& $this->parent->getSwePhp()->swed->oec2000;
+        return $this->app_pos_rest($psdp, $iflag, $xx, $xxsv, $oe, $serr);
+    }
+
+    /* transforms position of mean lunar node or apogee:
+     * input is polar coordinates in mean ecliptic of date.
+     * output is, according to iflag:
+     * position accounted for light-time
+     * position referred to J2000 (i.e. precession subtracted)
+     * position with nutation
+     * equatorial coordinates
+     * cartesian coordinates
+     * heliocentric position is not allowed ??????????????
+     *         DAS WAERE ZIEMLICH AUFWENDIG. SONNE UND ERDE MUESSTEN
+     *         SCHON VORHANDEN SEIN!
+     * ipl		bodynumber (SE_MEAN_NODE or SE_MEAN_APOG)
+     * iflag	flags
+     * serr         error string
+     */
+    function app_pos_etc_mean(int $ipl, int $iflag, ?string &$serr = null): int
+    {
+        $pdp =& $this->parent->getSwePhp()->swed->nddat[$ipl];
+        // if the same conversions have already been done for the same
+        // date, then return
+        $flg1 = $iflag & ~SweConst::SEFLG_EQUATORIAL & ~SweConst::SEFLG_XYZ;
+        $flg2 = $pdp->xflgs & ~SweConst::SEFLG_EQUATORIAL & ~SweConst::SEFLG_XYZ;
+        if ($flg1 == $flg2) {
+            $pdp->xflgs = $iflag;
+            $pdp->iephe = $iflag & Sweph::SEFLG_EPHMASK;
+            return SweConst::OK;
+        }
+        for ($i = 0; $i <= 5; $i++)
+            $xx[$i] = $pdp->x[$i];
+        // cartesian equatorial coordinates
+        $this->parent->getSwePhp()->swephLib->swi_polcart_sp($xx, $xx);
+        $this->parent->getSwePhp()->swephLib->swi_coortrf2($xx, $xx,
+            -$this->parent->getSwePhp()->swed->oec->seps,
+            $this->parent->getSwePhp()->swed->oec->ceps);
+        // TODO: - t[-_-t]
+        $xxo = [$xx[3], $xx[4], $xx[5]];
+        $this->parent->getSwePhp()->swephLib->swi_coortrf2($xxo, $xxo,
+            -$this->parent->getSwePhp()->swed->oec->seps,
+            $this->parent->getSwePhp()->swed->oec->ceps);
+        $xx[3] = $xxo[0];
+        $xx[4] = $xxo[1];
+        $xx[5] = $xxo[2];
+        if (!($iflag & SweConst::SEFLG_SPEED))
+            for ($i = 3; $i <= 5; $i++)
+                $xx[$i] = 0;
+        // J2000 coordinates; required for sidereal positions
+        if ((($iflag & SweConst::SEFLG_SIDEREAL) &&
+                ($this->parent->getSwePhp()->swed->sidd->sid_mode & SweConst::SE_SIDBIT_ECL_T0)) ||
+            ($this->parent->getSwePhp()->swed->sidd->sid_mode & SweConst::SE_SIDBIT_SSY_PLANE)) {
+            for ($i = 0; $i <= 5; $i++)
+                $xxsv[$i] = $xx[$i];
+            // xxsv is not J2000 yet!
+            if ($pdp->teval != Sweph::J2000) {
+                $this->parent->getSwePhp()->swephLib->swi_precess($xxsv, $pdp->teval, $iflag, SweConst::J_TO_J2000);
+                if ($iflag & SweConst::SEFLG_SPEED)
+                    $this->swi_precess_speed($xxsv, $pdp->teval, $iflag, SweConst::J_TO_J2000);
+            }
+        }
+        /*****************************************************
+         * if no precession, equator of date -> equator 2000 *
+         *****************************************************/
+        if ($iflag & SweConst::SEFLG_J2000) {
+            $this->parent->getSwePhp()->swephLib->swi_precess($xx, $pdp->teval, $iflag, SweConst::J_TO_J2000);
+            if ($iflag & SweConst::SEFLG_SPEED)
+                $this->swi_precess_speed($xx, $pdp->teval, $iflag, SweConst::J_TO_J2000);
+            $oe =& $this->parent->getSwePhp()->swed->oec2000;
+        } else
+            $oe =& $this->parent->getSwePhp()->swed->oec;
+        return $this->app_pos_rest($pdp, $iflag, $xx, $xxsv, $oe, $serr);
+    }
 }
