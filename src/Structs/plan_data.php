@@ -2,10 +2,10 @@
 
 namespace Structs;
 
+// the following data are read from file only once, immediately after
+// file has been opened
 class plan_data
 {
-    // the following data are read from file only once, immediately after
-    // file has been opened
 
     // internal body number
     public int $ibdy;
