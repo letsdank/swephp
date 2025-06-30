@@ -6,8 +6,10 @@ use Enums\SwePlanet;
 use Enums\SweSiderealMode;
 use Structs\epsilon;
 use Structs\file_data;
+use Structs\nut;
 use Structs\plan_data;
 use Structs\save_positions;
+use Utils\ArrayUtils;
 
 class sweph_calc
 {
@@ -3446,5 +3448,795 @@ class sweph_calc
         } else
             $oe =& $this->parent->getSwePhp()->swed->oec;
         return $this->app_pos_rest($pdp, $iflag, $xx, $xxsv, $oe, $serr);
+    }
+
+    const int SEI_CURR_FPOS = -1;
+    const int SEI_FILE_LITTLEENDIAN = 1;
+    const int SEI_FILE_REORD = 2;
+
+    /* fetch chebyshew coefficients from sweph file for
+     * tjd 		time
+     * ipli		planet number
+     * ifno		file number
+     * serr		error string
+     */
+    function get_new_segment(float $tjd, int $ipli, int $ifno, ?string &$serr = null): int
+    {
+        $c = [];
+        $pdp =& $this->parent->getSwePhp()->swed->pldat[$ipli];
+        $fdp =& $this->parent->getSwePhp()->swed->fidat[$ifno];
+        $fp = $fdp->fptr;
+        $freord = (int)$fdp->iflg & self::SEI_FILE_REORD;
+        $fendian = (int)$fdp->iflg & self::SEI_FILE_LITTLEENDIAN;
+        // compute segment number
+        $iseg = (int)(($tjd - $pdp->tfstart) / $pdp->dseg);
+        $pdp->tseg0 = $pdp->tfstart + $iseg * $pdp->dseg;
+        $pdp->tseg1 = $pdp->tseg0 + $pdp->dseg;
+        // get file position of coefficients from file
+        $fpos = $pdp->lndx0 + $iseg * 3;
+        $retc = $this->do_fread($fpos, 3, 1, 4, $fp, $fpos, $freord, $fendian, $ifno, $serr);
+        if ($retc != SweConst::OK)
+            goto return_error_gns;
+        fseek($fp, $fpos, SEEK_SET);
+        // clear space of chebyshew coefficients
+        if ($pdp->segp == null)
+            $pdp->segp = [];
+        // read coefficients for 3 coordinates
+        for ($icoord = 0; $icoord < 3; $icoord++) {
+            $idbl = $icoord * $pdp->ncoe;
+            // first read header
+            // first bit indicates number of sizes of packed coefficients
+            $retc = $this->do_fread($c, 1, 2, 1, $fp, self::SEI_CURR_FPOS, $freord, $fendian, $ifno, $serr);
+            if ($retc != SweConst::OK)
+                goto return_error_gns;
+            if ($c[0] & 128) {
+                $nsizes = 6;
+                // TODO: TBD
+            }
+        }
+        return_error_gns:
+        // TODO: TBD
+        return SweConst::OK;
+    }
+
+    /* SWISSEPH
+     * reads constants on ephemeris file
+     * ifno         file #
+     * serr         error string
+     */
+    function read_const(int $ifno, ?string &$serr = null): int
+    {
+        // TODO: TBD
+        return SweConst::OK;
+    }
+
+    /* SWISSEPH
+     * reads from a file and, if necessary, reorders bytes
+     * targ 	target pointer
+     * size		size of item to be read
+     * count	number of items
+     * corrsize	in what size should it be returned
+     *		(e.g. 3 byte int -> 4 byte int)
+     * fp		file pointer
+     * fpos		file position: if (fpos >= 0) then fseek
+     * freord	reorder bytes or no
+     * fendian	little/bigendian
+     * ifno		file number
+     * serr		error string
+     */
+    function do_fread(array &$trg, int $size, int $count, int $corrsize, $fp, int $fpos, int $freord,
+                      int   $fendian, int $ifno, ?string &$serr = null): int
+    {
+        // TODO: TBD
+        return SweConst::OK;
+    }
+
+    /* SWISSEPH
+     * adds reference orbit to chebyshew series (if SEI_FLG_ELLIPSE),
+     * rotates series to mean equinox of J2000
+     *
+     * ipli		planet number
+     */
+    function rot_back(int $ipli): void
+    {
+        // double eps2000 = 0.409092804; // eps 2000 in radians
+        $seps2000 = 0.39777715572793088; // sin(eps2000)
+        $ceps2000 = 0.91748206215761929; // cos(eps2000)
+        $pdp =& $this->parent->getSwePhp()->swed->pldat[$ipli];
+        $nco = $pdp->ncoe;
+        $t = $pdp->tseg0 + $pdp->dseg / 2;
+        $chcfx = $pdp->segp;
+        $chcfy = $chcfx + $nco;
+        $chcfz = $chcfx + 2 * $nco;
+        $tdiff = ($t - $pdp->telem) / 365250.0;
+        if ($ipli == SweConst::SEI_MOON) {
+            $dn = $pdp->prot + $tdiff * $pdp->dprot;
+            $i = (int)($dn / SweConst::TWOPI);
+            $dn -= $i * SweConst::TWOPI;
+            $qav = ($pdp->qrot + $tdiff * $pdp->dqrot) * cos($dn);
+            $pav = ($pdp->qrot + $tdiff * $pdp->dqrot) * sin($dn);
+        } else {
+            $qav = $pdp->qrot + $tdiff * $pdp->dqrot;
+            $pav = $pdp->prot + $tdiff * $pdp->dprot;
+        }
+        // calculate cosine and sine of average perihelion longitude.
+        for ($i = 0; $i < $nco; $i++) {
+            $x[$i][0] = $chcfx[$i];
+            $x[$i][1] = $chcfy[$i];
+            $x[$i][2] = $chcfz[$i];
+        }
+        if ($pdp->iflg & SweConst::SEI_FLG_ELLIPSE) {
+            $refepx = $pdp->refep;
+            $refepy = $refepx + $nco;
+            $omtild = $pdp->peri + $tdiff * $pdp->dperi;
+            $i = (int)($omtild / SweConst::TWOPI);
+            $omtild -= $i * SweConst::TWOPI;
+            $com = cos($omtild);
+            $som = sin($omtild);
+            // add reference orbit.
+            for ($i = 0; $i < $nco; $i++) {
+                $x[$i][0] = $chcfx[$i] + $com * $refepx[$i] - $som * $refepy[$i];
+                $x[$i][1] = $chcfy[$i] + $com * $refepy[$i] + $som * $refepx[$i];
+            }
+        }
+        // construct right-handed orthonormal system with first axis along
+        // origin of longitudes and third axis along angular momentum
+        // this uses the standard formulas for equinoctial variables
+        // (see papers by broucke by cefola).
+        $cosih2 = 1.0 / (1.0 + $qav * $qav + $pav * $pav);
+        // calculate orbit pole.
+        $uiz[0] = 2.0 * $pav * $cosih2;
+        $uiz[1] = -2.0 * $qav * $cosih2;
+        $uiz[2] = (1.0 - $qav * $qav - $pav * $pav) * $cosih2;
+        // calculate origin of longitudes vector.
+        $uix[0] = (1.0 + $qav * $qav - $pav * $pav) * $cosih2;
+        $uix[1] = 2.0 * $qav * $pav * $cosih2;
+        $uix[2] = -2.0 * $pav * $cosih2;
+        // calculate vector in orbital plane orthogonal to origin of
+        // longitudes
+        $uiy[0] = 2.0 * $qav * $pav * $cosih2;
+        $uiy[1] = (1.0 - $qav * $qav + $pav * $pav) * $cosih2;
+        $uiy[2] = 2.0 * $qav * $cosih2;
+        // rotate to actual orientation in space.
+        for ($i = 0; $i < $nco; $i++) {
+            $xrot = $x[$i][0] * $uix[0] + $x[$i][1] * $uiy[0] + $x[$i][2] * $uiz[0];
+            $yrot = $x[$i][0] * $uix[1] + $x[$i][1] * $uiy[0] + $x[$i][2] * $uiz[1];
+            $zrot = $x[$i][0] * $uix[2] + $x[$i][1] * $uiy[2] + $x[$i][2] * $uiz[2];
+            if (abs($xrot) + abs($yrot) + abs($zrot) >= 1e-14)
+                $pdp->neval = $i;
+            $x[$i][0] = $xrot;
+            $x[$i][1] = $yrot;
+            $x[$i][2] = $zrot;
+            if ($ipli == SweConst::SEI_MOON) {
+                // rotate to j2000 equator
+                $x[$i][1] = $ceps2000 * $yrot - $seps2000 * $zrot;
+                $x[$i][2] = $seps2000 * $yrot + $ceps2000 * $zrot;
+            }
+        }
+        for ($i = 0; $i < $nco; $i++) {
+            $chcfx[$i] = $x[$i][0];
+            $chcfy[$i] = $x[$i][1];
+            $chcfz[$i] = $x[$i][2];
+        }
+    }
+
+    /* Adjust position from Earth-Moon barycenter to Earth
+     *
+     * xemb = hel./bar. position or velocity vectors of emb (input)
+     *                                                  earth (output)
+     * xmoon= geocentric position or velocity vector of moon
+     */
+    function embofs(array &$xemb, array $xmoon): void
+    {
+        for ($i = 0; $i <= 2; $i++)
+            $xemb[$i] -= $xmoon[$i] / (Sweph::EARTH_MOON_MRAT + 1.0);
+    }
+
+    /* calculates the nutation matrix
+     * nu		pointer to nutation data structure
+     * oe		pointer to epsilon data structure
+     */
+    function nut_matrix(nut $nu, epsilon $oe): void
+    {
+        $psi = $nu->nutlo[0];
+        $eps = $oe->eps + $nu->nutlo[1];
+        $sinpsi = sin($psi);
+        $cospsi = cos($psi);
+        $sineps0 = $oe->seps;
+        $coseps0 = $oe->ceps;
+        $sineps = sin($eps);
+        $coseps = cos($eps);
+        $nu->matrix[0][0] = $cospsi;
+        $nu->matrix[0][1] = $sinpsi * $coseps;
+        $nu->matrix[0][2] = $sinpsi * $sineps;
+        $nu->matrix[1][0] = -$sinpsi * $coseps0;
+        $nu->matrix[1][1] = $cospsi * $coseps * $coseps0 + $sineps * $sineps0;
+        $nu->matrix[1][2] = $cospsi * $sineps * $coseps0 - $coseps * $sineps0;
+        $nu->matrix[2][0] = -$sinpsi * $sineps0;
+        $nu->matrix[2][1] = $cospsi * $coseps * $sineps0 - $sineps * $coseps0;
+        $nu->matrix[2][2] = $cospsi * $sineps * $sineps0 + $coseps * $coseps0;
+    }
+
+    /* lunar osculating elements, i.e.
+     * osculating node ('true' node) and
+     * osculating apogee ('black moon', 'lilith').
+     * tjd		julian day
+     * ipl		body number, i.e. SEI_TRUE_NODE or SEI_OSCU_APOG
+     * iflag	flags (which ephemeris, nutation, etc.)
+     * serr		error string
+     *
+     * definitions and remarks:
+     * the osculating node and the osculating apogee are defined
+     * as the orbital elements of the momentary lunar orbit.
+     * their advantage is that when the moon crosses the ecliptic,
+     * it is really at the osculating node, and when it passes
+     * its greatest distance from earth it is really at the
+     * osculating apogee. with the mean elements this is not
+     * the case. (some define the apogee as the second focus of
+     * the lunar ellipse. but, as seen from the geocenter, both
+     * points are in the same direction.)
+     * problems:
+     * the osculating apogee is given in the 'New International
+     * Ephemerides' (Editions St. Michel) as the 'True Lilith'.
+     * however, this name is misleading. this point is based on
+     * the idea that the lunar orbit can be approximated by an
+     * ellipse.
+     * arguments against this:
+     * 1. this procedure considers celestial motions as two body
+     *    problems. this is quite good for planets, but not for
+     *    the moon. the strong gravitational attraction of the sun
+     *    destroys the idea of an ellipse.
+     * 2. the NIE 'True Lilith' has strong oscillations around the
+     *    mean one with an amplitude of about 30 degrees. however,
+     *    when the moon is in apogee, its distance from the mean
+     *    apogee never exceeds 5 degrees.
+     * besides, the computation of NIE is INACCURATE. the mistake
+     * reaches 20 arc minutes.
+     * According to Santoni, the point was calculated using 'les 58
+     * premiers termes correctifs au Perigee moyen' published by
+     * Chapront and Chapront-Touze. And he adds: "Nous constatons
+     * que meme en utilisant ces 58 termes CORRECTIFS, l'erreur peut
+     * atteindre 0,5d!" (p. 13) We avoid this error, computing the
+     * orbital elements directly from the position and the speed vector.
+     *
+     * how about the node? it is less problematic, because we
+     * we needn't derive it from an orbital ellipse. we can say:
+     * the axis of the osculating nodes is the intersection line of
+     * the actual orbital plane of the moon and the plane of the
+     * ecliptic. or: the osculating nodes are the intersections of
+     * the two great circles representing the momentary apparent
+     * orbit of the moon and the ecliptic. in this way they make
+     * some sense. then, the nodes are really an axis, and they
+     * have no geocentric distance. however, in this routine
+     * we give a distance derived from the osculating ellipse.
+     * the node could also be defined as the intersection axis
+     * of the lunar orbital plane and the solar orbital plane,
+     * which is not precisely identical to the ecliptic. this
+     * would make a difference of several arcseconds.
+     *
+     * is it possible to keep the idea of a continuously moving
+     * apogee that is exact at the moment when the moon passes
+     * its greatest distance from earth?
+     * to achieve this, we would probably have to interpolate between
+     * the actual apogees.
+     * the nodes could also be computed by interpolation. the resulting
+     * nodes would deviate from the so-called 'true node' by less than
+     * 30 arc minutes.
+     *
+     * sidereal and j2000 true node are first computed for the ecliptic
+     * of epoch and then precessed to ecliptic of t0(ayanamsa) or J2000.
+     * there is another procedure that computes the node for the ecliptic
+     * of t0(ayanamsa) or J2000. it is excluded by
+     * #ifdef SID_TNODE_FROM_ECL_T0
+     */
+    function lunar_osc_elem(float $tjd, int $ipl, int $iflag, ?string &$serr = null): int
+    {
+        $ipli = SweConst::SEI_MOON;
+        $epheflag = SweConst::SEFLG_DEFAULTEPH;
+        $retc = SweConst::ERR;
+        $speed_intv = Sweph::NODE_CALC_INTV; // to silence gcc warning
+        $xpos = ArrayUtils::createArray2D(3, 6);
+        $xx = ArrayUtils::createArray2D(3, 6);
+        $xnorm = [];
+        $r = [];
+        // TODO: SID_TNODE_FROM_ECL_T0
+        $oe =& $this->parent->getSwePhp()->swed->oec;
+        // TODO: SID_TNODE_FROM_ECL_T0
+        $ndp =& $this->parent->getSwePhp()->swed->nddat[$ipl];
+        // if elements have already been computed for this date, return
+        // if speed flag has been turned on, recompute
+        $flg1 = $iflag & ~SweConst::SEFLG_EQUATORIAL & ~SweConst::SEFLG_XYZ;
+        $flg2 = $ndp->xflgs & ~SweConst::SEFLG_EQUATORIAL & ~SweConst::SEFLG_XYZ;
+        $speedf1 = $ndp->xflgs & SweConst::SEFLG_SPEED;
+        $speedf2 = $iflag & SweConst::SEFLG_SPEED;
+        if ($tjd == $ndp->teval && $tjd != 0 && $flg1 == $flg2 && (!$speedf2 || $speedf1)) {
+            $ndp->xflgs = $iflag;
+            $ndp->iephe = $iflag & Sweph::SEFLG_EPHMASK;
+            return SweConst::OK;
+        }
+        /* the geocentric position vector and the speed vector of the
+       * moon make up the lunar orbital plane. the position vector
+       * of the node is along the intersection line of the orbital
+       * plane and the plane of the ecliptic.
+       * to calculate the osculating node, we need one lunar position
+       * with speed.
+       * to calculate the speed of the osculating node, we need
+       * three lunar positions and the speed of each of them.
+       * this is relatively cheap, if the jpl-moon or the swisseph
+       * moon is used. with the moshier moon this is much more
+       * expensive, because then we need 9 lunar positions for
+       * three speeds. but one position and speed can normally
+       * be taken from swed.pldat[moon], which corresponds to
+       * three moshier moon calculations.
+       * the same is also true for the osculating apogee: we need
+       * three lunar positions and speeds.
+       */
+        /*********************************************
+         * now three lunar positions with speeds     *
+         *********************************************/
+        if ($iflag & SweConst::SEFLG_MOSEPH) {
+            $epheflag = SweConst::SEFLG_MOSEPH;
+        } else if ($iflag & SweConst::SEFLG_SWIEPH) {
+            $epheflag = SweConst::SEFLG_SWIEPH;
+        } else if ($iflag & SweConst::SEFLG_JPLEPH) {
+            $epheflag = SweConst::SEFLG_JPLEPH;
+        }
+        // there may be a moon of wrong ephemeris in save area
+        // force new computation:
+        $this->parent->getSwePhp()->swed->pldat[SweConst::SEI_MOON]->teval = 0;
+        if ($iflag & SweConst::SEFLG_SPEED) {
+            $istart = 0;
+        } else {
+            $istart = 2;
+        }
+        if (isset($serr))
+            $serr = "";
+        three_positions:
+        switch ($epheflag) {
+            case SweConst::SEFLG_JPLEPH:
+                $speed_intv = Sweph::NODE_CALC_INTV;
+                for ($i = $istart; $i <= 2; $i++) {
+                    if ($i == 0)
+                        $t = $tjd - $speed_intv;
+                    else if ($i == 1)
+                        $t = $tjd + $speed_intv;
+                    else
+                        $t = $tjd;
+                    $xp = $xpos[$i];
+                    $retc = $this->jplplan($t, $ipli, $iflag, false, $xp, serr: $serr);
+                    // read error or corrupt file
+                    if ($retc == SweConst::ERR)
+                        return SweConst::ERR;
+                    // light-time-corrected moon for apparent node
+                    // this makes a difference of several milliarcseconds with
+                    // the node and 0.1" with the apogee.
+                    // the simple formula 'x[j] -= dt * speed' should not be
+                    // used here. the error would be greater than the advantage
+                    // of computation speed.
+                    if (($iflag & SweConst::SEFLG_TRUEPOS) == 0 && $retc >= SweConst::OK) {
+                        $dt = sqrt(Sweph::square_num($xpos[$i])) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
+                        $retc = $this->jplplan($t - $dt, $ipli, $iflag, false, $xpos[$i], serr: $serr);
+                        // read error or corrupt file
+                        if ($retc == SweConst::ERR)
+                            return SweConst::ERR;
+                    }
+                    // jpl ephemeris not on disk, or date beyond ephemeris range
+                    if ($retc == SweConst::NOT_AVAILABLE) {
+                        $iflag = ($iflag & ~SweConst::SEFLG_JPLEPH) | SweConst::SEFLG_SWIEPH;
+                        $epheflag = SweConst::SEFLG_SWIEPH;
+                        if (isset($serr))
+                            $serr .= " \ntrying Swiss Eph; ";
+                        break;
+                    } else if ($retc == SweConst::BEYOND_EPH_LIMITS) {
+                        if ($tjd > SweConst::MOSHPLEPH_START && $tjd < SweConst::MOSHLUEPH_END) {
+                            $iflag = ($iflag & ~SweConst::SEFLG_JPLEPH) | SweConst::SEFLG_MOSEPH;
+                            $epheflag = SweConst::SEFLG_MOSEPH;
+                            if (isset($serr))
+                                $serr .= " \nusing Moshier Eph; ";
+                            break;
+                        } else
+                            return SweConst::ERR;
+                    }
+                    // precessiojn and nutation etc.
+                    $retc = $this->swi_plan_for_osc_elem($iflag | SweConst::SEFLG_SPEED, $t, $xpos[$i]); // retc is always ok
+                }
+                break;
+            case SweConst::SEFLG_SWIEPH:
+                $speed_intv = Sweph::NODE_CALC_INTV;
+                for ($i = $istart; $i <= 2; $i++) {
+                    if ($i == 0)
+                        $t = $tjd - $speed_intv;
+                    else if ($i == 1)
+                        $t = $tjd + $speed_intv;
+                    else
+                        $t = $tjd;
+                    $retc = $this->swemoon($t, $iflag | SweConst::SEFLG_SPEED, false, $xpos[$i], $serr);
+                    if ($retc == SweConst::ERR)
+                        return SweConst::ERR;
+                    // light-time-corrected moon for apparent node (~ 0.006")
+                    if (($iflag & SweConst::SEFLG_TRUEPOS) == 0 && $retc >= SweConst::OK) {
+                        $dt = sqrt(Sweph::square_num($xpos[$i])) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
+                        $retc = $this->swemoon($t - $dt, $iflag | SweConst::SEFLG_SPEED, false, $xpos[$i], $serr);
+                        if ($retc == SweConst::ERR)
+                            return SweConst::ERR;
+                    }
+                    if ($retc == SweConst::NOT_AVAILABLE) {
+                        if ($tjd > SweConst::MOSHPLEPH_START && $tjd < SweConst::MOSHPLEPH_END) {
+                            $iflag = ($iflag & ~SweConst::SEFLG_SWIEPH) | SweConst::SEFLG_MOSEPH;
+                            $epheflag = SweConst::SEFLG_MOSEPH;
+                            if (isset($serr))
+                                $serr .= " \nusing Moshier eph.; ";
+                            break;
+                        } else
+                            return SweConst::ERR;
+                    }
+                    // precession and nutation etc.
+                    $retc = $this->swi_plan_for_osc_elem($iflag | SweConst::SEFLG_SPEED, $t, $xpos[$i]); // retc is always ok
+                }
+                break;
+            case SweConst::SEFLG_MOSEPH:
+                // with moshier moon, we need a greater speed_intv, because here the
+                // node and apogee oscillate wildly within small intervals
+                $speed_intv = Sweph::NODE_CALC_INTV_MOSH;
+                for ($i = $istart; $i <= 2; $i++) {
+                    if ($i == 0)
+                        $t = $tjd - $speed_intv;
+                    else if ($i == 1)
+                        $t = $tjd + $speed_intv;
+                    else
+                        $t = $tjd;
+                    $retc = $this->swi_moshmoon($t, false, $xpos[$i], $serr);
+                    if ($retc == SweConst::ERR)
+                        return $retc;
+                    // precession and nutation etc.
+                    $retc = $this->swi_plan_for_osc_elem($iflag | SweConst::SEFLG_SPEED, $t, $xpos[$i]);
+                }
+                break;
+            default:
+                break;
+        }
+        if ($retc == SweConst::NOT_AVAILABLE || $retc == SweConst::BEYOND_EPH_LIMITS)
+            goto three_positions;
+        /*********************************************
+         * node with speed                           *
+         *********************************************/
+        // node is always needed, even if apogee is wanted
+        $ndnp =& $this->parent->getSwePhp()->swed->nddat[SweConst::SEI_TRUE_NODE];
+        // three nodes
+        for ($i = $istart; $i <= 2; $i++) {
+            if (abs($xpos[$i][5]) < 1e-15)
+                $xpos[$i][5] = 1e-15;
+            $fac = $xpos[$i][2] / $xpos[$i][5];
+            $sgn = $xpos[$i][5] / abs($xpos[$i][5]);
+            for ($j = 0; $j <= 2; $j++)
+                $xx[$i][$j] = ($xpos[$i][$j] - $fac * $xpos[$i][$j + 3]) * $sgn;
+        }
+        // now we have the correct direction of the node, the
+        // intersection of the lunar plane and the ecliptic plane.
+        // the distance is the distance of the point where the tangent
+        // of the lunar motion penetrates the ecliptic plane.
+        // this can be very large, e.g. j2415080.37372.
+        // below, a new distance will be derived from the osculating
+        // ellipse.
+        //
+
+        // save position and speed
+        for ($i = 0; $i <= 2; $i++) {
+            $ndnp->x[$i] = $xx[2][$i];
+            if ($iflag & SweConst::SEFLG_SPEED) {
+                $b = ($xx[1][$i] - $xx[0][$i]) / 2;
+                $a = ($xx[1][$i] + $xx[0][$i]) / 2 - $xx[2][$i];
+                $ndnp->x[$i + 3] = (2 * $a + $b) / $speed_intv;
+            } else
+                $ndnp->x[$i + 3] = 0;
+            $ndnp->teval = $tjd;
+            $ndnp->iephe = $epheflag;
+        }
+        /************************************************************
+         * apogee with speed                                        *
+         * must be computed anyway to get the node's distance       *
+         ************************************************************/
+        $ndap =& $this->parent->getSwePhp()->swed->nddat[SweConst::SEI_OSCU_APOG];
+        $Gmsm = Sweph::GEOGCONST * (1 + 1 / Sweph::EARTH_MOON_MRAT) / Sweph::AUNIT / Sweph::AUNIT / Sweph::AUNIT * 86400.0 * 86400.0;
+        // three apogees
+        for ($i = $istart; $i <= 2; $i++) {
+            // node
+            $rxy = sqrt($xx[$i][0] * $xx[$i][0] + $xx[$i][1] * $xx[$i][1]);
+            $cosnode = $xx[$i][0] / $rxy;
+            $sinnode = $xx[$i][1] / $rxy;
+            // inclination
+            $this->parent->getSwePhp()->swephLib->swi_cross_prod($xpos[$i],
+                array_values(array_slice($xpos[$i], 3)), $xnorm);
+            $rxy = $xnorm[0] * $xnorm[0] + $xnorm[1] * $xnorm[1];
+            $c2 = ($rxy + $xnorm[2] * $xnorm[2]);
+            $rxyz = sqrt($c2);
+            $rxy = sqrt($rxy);
+            $sinincl = $rxy / $rxyz;
+            $cosincl = sqrt(1 - $sinincl * $sinincl);
+            // argument of latitude
+            $cosu = $xpos[$i][0] * $cosnode + $xpos[$i][1] * $sinnode;
+            $sinu = $xpos[$i][2] / $sinincl;
+            $uu = atan2($sinu, $cosu);
+            // semi-axis
+            $rxyz = sqrt(Sweph::square_num($xpos[$i]));
+            $v2 = Sweph::square_num(array_values(array_slice($xpos[$i], 3)));
+            $sema = 1 / (2 / $rxyz - $v2 / $Gmsm);
+            // eccentricity
+            $pp = $c2 / $Gmsm;
+            $ecce = sqrt(1 - $pp / $sema);
+            // eccentric anomaly
+            $cosE = 1 / $ecce * (1 - $rxyz / $sema);
+            $sinE = 1 / $ecce / sqrt($sema * $Gmsm) * Sweph::dot_prod($xpos[$i],
+                    array_values(array_slice($xpos[$i], 3)));
+            // true anomaly
+            $ny = 2 * atan(sqrt((1 + $ecce) / (1 - $ecce)) * $sinE / (1 + $cosE));
+            // distance of apogee from ascending node
+            $xxa[$i][0] = $this->parent->getSwePhp()->swephLib->swi_mod2PI($uu - $ny + M_PI);
+            $xxa[$i][1] = 0;                        // latitude
+            $xxa[$i][2] = $sema * (1 + $ecce);      // distance
+            // transformation to ecliptic coordinates
+            $this->parent->getSwePhp()->swephLib->swi_polcart($xxa[$i], $xxa[$i]);
+            $this->parent->getSwePhp()->swephLib->swi_coortrf2($xxa[$i], $xxa[$i], $sinincl, $cosincl);
+            $this->parent->getSwePhp()->swephLib->swi_cartpol($xxa[$i], $xxa[$i]);
+            // adding node, we get apogee in ecl. coord.
+            $xxa[$i][0] += atan2($sinnode, $cosnode);
+            $this->parent->getSwePhp()->swephLib->swi_polcart($xxa[$i], $xxa[$i]);
+            // new distance of node from orbital ellipse:
+            // true anomaly of node:
+            $ny = $this->parent->getSwePhp()->swephLib->swi_mod2PI($ny - $uu);
+            // eccentric anomaly
+            $cosE = cos(2 * atan(tan($ny / 2) / sqrt((1 + $ecce) / (1 - $ecce))));
+            // new distance
+            $r[0] = $sema * (1 - $ecce * $cosE);
+            // old node distance
+            $r[1] = sqrt(Sweph::square_num($xx[$i]));
+            // correct length of position vector
+            for ($j = 0; $j <= 2; $j++)
+                $xx[$i][$j] *= $r[0] / $r[1];
+        }
+        // save position and speed
+        for ($i = 0; $i <= 2; $i++) {
+            // apogee
+            $ndap->x[$i] = $xxa[2][$i];
+            if ($iflag & SweConst::SEFLG_SPEED) {
+                $ndap->x[$i + 3] = ($xxa[1][$i] - $xxa[0][$i]) / $speed_intv / 2;
+            } else {
+                $ndap->x[$i + 3] = 0;
+            }
+            $ndap->teval = $tjd;
+            $ndap->iephe = $epheflag;
+            // node
+            $ndnp->x[$i] = $xx[2][$i];
+            if ($iflag & SweConst::SEFLG_SPEED) {
+                $ndnp->x[$i + 3] = ($xx[1][$i] - $xx[0][$i]) / $speed_intv / 2;
+            } else {
+                $ndnp->x[$i + 3] = 0;
+            }
+        }
+        /**********************************************************************
+         * precession and nutation have already been taken into account
+         * because the computation is on the basis of lunar positions
+         * that have gone through swi_plan_for_osc_elem.
+         * light-time is already contained in lunar positions.
+         * now compute polar and equatorial coordinates:
+         **********************************************************************/
+        for ($j = 0; $j <= 1; $j++) {
+            $x = [];
+            if ($j == 0)
+                $ndp =& $this->parent->getSwePhp()->swed->nddat[SweConst::SEI_TRUE_NODE];
+            else
+                $ndp =& $this->parent->getSwePhp()->swed->nddat[SweConst::SEI_OSCU_APOG];
+            $ndp->xreturn = [];
+            // cartesian ecliptic
+            for ($i = 0; $i <= 5; $i++)
+                $ndp->xreturn[6 + $i] = $ndp->x[$i];
+            // polar ecliptic
+            $this->parent->getSwePhp()->swephLib->swi_cartpol_sp(
+                array_values(array_slice($ndp->xreturn, 6)), $ndp->xreturn);
+            // cartesian equatorial
+            // TODO: - t[-_-t]
+            $xreto = [$ndp->xreturn[18], $ndp->xreturn[19], $ndp->xreturn[20]];
+            $this->parent->getSwePhp()->swephLib->swi_coortrf2(
+                array_values(array_slice($ndp->xreturn, 6)), $xreto, -$oe->seps, $oe->ceps);
+            $ndp->xreturn[18] = $xreto[0];
+            $ndp->xreturn[19] = $xreto[1];
+            $ndp->xreturn[20] = $xreto[2];
+            if ($iflag & SweConst::SEFLG_SPEED) {
+                // TODO: - t[-_-t]
+                $xreto = [$ndp->xreturn[21], $ndp->xreturn[22], $ndp->xreturn[23]];
+                $this->parent->getSwePhp()->swephLib->swi_coortrf2(
+                    array_values(array_slice($ndp->xreturn, 9)), $xreto, -$oe->seps, $oe->ceps);
+                $ndp->xreturn[21] = $xreto[0];
+                $ndp->xreturn[22] = $xreto[1];
+                $ndp->xreturn[23] = $xreto[2];
+            }
+            // TODO: SID_TNODE_FROM_ECL_T0
+            if (!($iflag & SweConst::SEFLG_NONUT)) {
+                // TODO: - t[-_-t]
+                $xreto = [$ndp->xreturn[18], $ndp->xreturn[19], $ndp->xreturn[20]];
+                $this->parent->getSwePhp()->swephLib->swi_coortrf2($xreto, $xreto,
+                    -$this->parent->getSwePhp()->swed->nut->snut,
+                    $this->parent->getSwePhp()->swed->nut->cnut);
+                $ndp->xreturn[18] = $xreto[0];
+                $ndp->xreturn[19] = $xreto[1];
+                $ndp->xreturn[20] = $xreto[2];
+                if ($iflag & SweConst::SEFLG_SPEED) {
+                    // TODO: - t[-_-t]
+                    $xreto = [$ndp->xreturn[21], $ndp->xreturn[22], $ndp->xreturn[23]];
+                    $this->parent->getSwePhp()->swephLib->swi_coortrf2($xreto, $xreto,
+                        -$this->parent->getSwePhp()->swed->nut->snut,
+                        $this->parent->getSwePhp()->swed->nut->cnut);
+                    $ndp->xreturn[21] = $xreto[0];
+                    $ndp->xreturn[22] = $xreto[1];
+                    $ndp->xreturn[23] = $xreto[2];
+                }
+            }
+            // polar equatorial
+            // TODO: - t[-_-t]
+            $xreto = [$ndp->xreturn[12], $ndp->xreturn[13], $ndp->xreturn[14],
+                $ndp->xreturn[15], $ndp->xreturn[16], $ndp->xreturn[17]];
+            $this->parent->getSwePhp()->swephLib->swi_cartpol_sp(
+                array_values(array_slice($ndp->xreturn, 18)), $xreto);
+            $ndp->xreturn[12] = $xreto[0];
+            $ndp->xreturn[13] = $xreto[1];
+            $ndp->xreturn[14] = $xreto[2];
+            $ndp->xreturn[15] = $xreto[3];
+            $ndp->xreturn[16] = $xreto[4];
+            $ndp->xreturn[17] = $xreto[5];
+            $ndp->xflgs = $iflag;
+            $ndp->iephe = $iflag & Sweph::SEFLG_EPHMASK;
+            if (false) {
+                // TODO: SID_TNODE_FROM_ECL_T0
+
+            } else {
+                if ($iflag & SweConst::SEFLG_SIDEREAL) {
+                    // node and apogee are referred to t;
+                    // the ecliptic position must be transformed to t0
+
+                    // rigorous algorithm
+                    if (($this->parent->getSwePhp()->swed->sidd->sid_mode & SweConst::SE_SIDBIT_ECL_T0) ||
+                        ($this->parent->getSwePhp()->swed->sidd->sid_mode & SweConst::SE_SIDBIT_SSY_PLANE)) {
+                        for ($i = 0; $i <= 5; $i++)
+                            $x[$i] = $ndp->xreturn[18 + $i];
+                        // remove nutation
+                        if (!($iflag & SweConst::SEFLG_NONUT))
+                            $this->swi_nutate($x, $iflag, true);
+                        // precess to J2000
+                        $this->parent->getSwePhp()->swephLib->swi_precess($x, $tjd, $iflag, SweConst::J_TO_J2000);
+                        if ($iflag & SweConst::SEFLG_SPEED)
+                            $this->swi_precess_speed($x, $tjd, $iflag, SweConst::J_TO_J2000);
+                        if ($this->parent->getSwePhp()->swed->sidd->sid_mode & SweConst::SE_SIDBIT_ECL_T0) {
+                            // TODO: - t[-_-t]
+                            $xout = [$ndp->xreturn[6], $ndp->xreturn[7], $ndp->xreturn[8],
+                                $ndp->xreturn[9], $ndp->xreturn[10], $ndp->xreturn[11]];
+                            $xoutr = [$ndp->xreturn[18], $ndp->xreturn[19], $ndp->xreturn[20],
+                                $ndp->xreturn[21], $ndp->xreturn[22], $ndp->xreturn[23]];
+                            $this->swi_trop_ra2sid_lon($x, $xout, $xoutr, $iflag);
+                            $ndp->xreturn[6] = $xout[0];
+                            $ndp->xreturn[7] = $xout[1];
+                            $ndp->xreturn[8] = $xout[2];
+                            $ndp->xreturn[9] = $xout[3];
+                            $ndp->xreturn[10] = $xout[4];
+                            $ndp->xreturn[11] = $xout[5];
+                            $ndp->xreturn[18] = $xoutr[0];
+                            $ndp->xreturn[19] = $xoutr[1];
+                            $ndp->xreturn[20] = $xoutr[2];
+                            $ndp->xreturn[21] = $xoutr[3];
+                            $ndp->xreturn[22] = $xoutr[4];
+                            $ndp->xreturn[23] = $xoutr[5];
+                            // project onto solar system equator
+                        } else if ($this->parent->getSwePhp()->swed->sidd->sid_mode & SweConst::SE_SIDBIT_SSY_PLANE) {
+                            // TODO: - t[-_-t]
+                            $xout = [$ndp->xreturn[6], $ndp->xreturn[7], $ndp->xreturn[8],
+                                $ndp->xreturn[9], $ndp->xreturn[10], $ndp->xreturn[11]];
+                            $this->swi_trop_ra2sid_lon_sosy($x, $xout, $iflag);
+                            $ndp->xreturn[6] = $xout[0];
+                            $ndp->xreturn[7] = $xout[1];
+                            $ndp->xreturn[8] = $xout[2];
+                            $ndp->xreturn[9] = $xout[3];
+                            $ndp->xreturn[10] = $xout[4];
+                            $ndp->xreturn[11] = $xout[5];
+                        }
+                        // to polar
+                        $this->parent->getSwePhp()->swephLib->swi_cartpol_sp(
+                            array_values(array_slice($ndp->xreturn, 6)), $ndp->xreturn);
+                        // TODO: - t[-_-t]
+                        $xreto = [$ndp->xreturn[12], $ndp->xreturn[13], $ndp->xreturn[14],
+                            $ndp->xreturn[15], $ndp->xreturn[16], $ndp->xreturn[17]];
+                        $this->parent->getSwePhp()->swephLib->swi_cartpol_sp(
+                            array_values(array_slice($ndp->xreturn, 18)), $xreto);
+                        $ndp->xreturn[12] = $xreto[0];
+                        $ndp->xreturn[13] = $xreto[1];
+                        $ndp->xreturn[14] = $xreto[2];
+                        $ndp->xreturn[15] = $xreto[3];
+                        $ndp->xreturn[16] = $xreto[4];
+                        $ndp->xreturn[17] = $xreto[5];
+                        // traditional algorithm;
+                        // this is a bit clumsy, but allows us to keep the
+                        // sidereal code together
+                    } else {
+                        $this->parent->getSwePhp()->swephLib->swi_cartpol_sp(
+                            array_values(array_slice($ndp->xreturn, 6)), $ndp->xreturn);
+                        if ($this->swi_get_ayanamsa_with_speed($ndp->teval, $iflag, $daya, $serr) == SweConst::ERR)
+                            return SweConst::ERR;
+                        $ndp->xreturn[0] -= $daya[0] * SweConst::DEGTORAD;
+                        $ndp->xreturn[3] -= $daya[1] * SweConst::DEGTORAD;
+                        // TODO: - t[-_-t]
+                        $xreto = [$ndp->xreturn[6], $ndp->xreturn[7], $ndp->xreturn[8],
+                            $ndp->xreturn[9], $ndp->xreturn[10], $ndp->xreturn[11]];
+                        $this->parent->getSwePhp()->swephLib->swi_polcart_sp($ndp->xreturn, $xreto);
+                        $ndp->xreturn[6] = $xreto[0];
+                        $ndp->xreturn[7] = $xreto[1];
+                        $ndp->xreturn[8] = $xreto[2];
+                        $ndp->xreturn[9] = $xreto[3];
+                        $ndp->xreturn[10] = $xreto[4];
+                        $ndp->xreturn[11] = $xreto[5];
+                    }
+                } else if ($iflag & SweConst::SEFLG_J2000) {
+                    // node and apogee are referred to t;
+                    // the ecliptic position must be transformed to J2000
+                    for ($i = 0; $i <= 5; $i++)
+                        $x[$i] = $ndp->xreturn[18 + $i];
+                    // precess to J2000
+                    $this->parent->getSwePhp()->swephLib->swi_precess($x, $tjd, $iflag, SweConst::J_TO_J2000);
+                    if ($iflag & SweConst::SEFLG_SPEED)
+                        $this->swi_precess_speed($x, $tjd, $iflag, SweConst::J_TO_J2000);
+                    for ($i = 0; $i <= 5; $i++)
+                        $ndp->xreturn[18 + $i] = $x[$i];
+                    // TODO: - t[-_-t]
+                    $xreto = [$ndp->xreturn[12], $ndp->xreturn[13], $ndp->xreturn[14],
+                        $ndp->xreturn[15], $ndp->xreturn[16], $ndp->xreturn[17]];
+                    $this->parent->getSwePhp()->swephLib->swi_cartpol_sp(
+                        array_values(array_slice($ndp->xreturn, 18)), $xreto);
+                    $ndp->xreturn[12] = $xreto[0];
+                    $ndp->xreturn[13] = $xreto[1];
+                    $ndp->xreturn[14] = $xreto[2];
+                    $ndp->xreturn[15] = $xreto[3];
+                    $ndp->xreturn[16] = $xreto[4];
+                    $ndp->xreturn[17] = $xreto[5];
+                    // TODO: - t[-_-t]
+                    $xout = [$ndp->xreturn[6], $ndp->xreturn[7], $ndp->xreturn[8]];
+                    $this->parent->getSwePhp()->swephLib->swi_coortrf2(
+                        array_values(array_slice($ndp->xreturn, 18)), $xout,
+                        $this->parent->getSwePhp()->swed->oec2000->seps,
+                        $this->parent->getSwePhp()->swed->oec2000->ceps);
+                    $ndp->xreturn[6] = $xout[0];
+                    $ndp->xreturn[7] = $xout[1];
+                    $ndp->xreturn[8] = $xout[2];
+                    if ($iflag & SweConst::SEFLG_SPEED) {
+                        // TODO: - t[-_-t]
+                        $xout = [$ndp->xreturn[9], $ndp->xreturn[10], $ndp->xreturn[11]];
+                        $this->parent->getSwePhp()->swephLib->swi_coortrf2(
+                            array_values(array_slice($ndp->xreturn, 21)), $xout,
+                            $this->parent->getSwePhp()->swed->oec2000->seps,
+                            $this->parent->getSwePhp()->swed->oec2000->ceps);
+                        $ndp->xreturn[9] = $xout[0];
+                        $ndp->xreturn[10] = $xout[1];
+                        $ndp->xreturn[11] = $xout[2];
+                    }
+                    $this->parent->getSwePhp()->swephLib->swi_cartpol_sp(
+                        array_values(array_slice($ndp->xreturn, 6)), $ndp->xreturn);
+                }
+            }
+            /**********************
+             * radians to degrees *
+             **********************/
+            for ($i = 0; $i < 2; $i++) {
+                $ndp->xreturn[$i] *= SweConst::RADTODEG;            // ecliptic
+                $ndp->xreturn[$i + 3] *= SweConst::RADTODEG;
+                $ndp->xreturn[$i + 12] *= SweConst::RADTODEG;       // equator
+                $ndp->xreturn[$i + 15] *= SweConst::RADTODEG;
+            }
+            $ndp->xreturn[0] = $this->parent->getSwePhp()->swephLib->swe_degnorm($ndp->xreturn[0]);
+            $ndp->xreturn[12] = $this->parent->getSwePhp()->swephLib->swe_degnorm($ndp->xreturn[12]);
+        }
+        return SweConst::OK;
+    }
+
+    /* lunar osculating elements, i.e.
+     */
+    function intp_apsides(float $tjd, int $ipl, int $iflag, ?string &$serr = null): int
+    {
+
     }
 }
