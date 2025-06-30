@@ -234,8 +234,7 @@ class SwephCotransUtils
         $x[4] *= SweConst::DEGTORAD;
         SwephCotransUtils::swi_polcart_sp($x, $x);
         SwephCotransUtils::swi_coortrf($x, $x, $e);
-        PointerUtils::pointerFn($x, 3,
-            fn(&$arr) => SwephCotransUtils::swi_coortrf($arr, $arr, $e));
+        self::swi_coortrf_ptr($x, 3, $x, 3, $e);
         SwephCotransUtils::swi_cartpol_sp($x, $xpn);
         $xpn[0] *= SweConst::RADTODEG;
         $xpn[1] *= SweConst::RADTODEG;
@@ -243,5 +242,51 @@ class SwephCotransUtils
         $xpn[3] *= SweConst::RADTODEG;
         $xpn[4] *= SweConst::RADTODEG;
         $xpn[5] = $xpo[5];
+    }
+
+    // Function with pointers
+
+    public static function swi_coortrf_ptr(array $xpo, int $xpo_off, array &$xpn,
+                                           int   $xpn_off, float $eps): void
+    {
+        PointerUtils::pointer2Fn($xpo, $xpn, $xpo_off, $xpn_off,
+            fn($xo, &$xn) => self::swi_coortrf($xo, $xn, $eps),
+            3, 3);
+    }
+
+    public static function swi_coortrf2_ptr(array $xpo, int $xpo_off, array &$xpn,
+                                            int   $xpn_off, float $sineps, float $coseps): void
+    {
+        PointerUtils::pointer2Fn($xpo, $xpn, $xpo_off, $xpn_off,
+            fn($xo, &$xn) => self::swi_coortrf2($xo, $xn, $sineps, $coseps),
+            3, 3);
+    }
+
+    public static function swi_cartpol_ptr(array $x, int $x_off, array &$l, int $l_off): void
+    {
+        PointerUtils::pointer2Fn($x, $l, $x_off, $l_off,
+            fn($xx, &$ll) => self::swi_cartpol($xx, $ll),
+            3, 3);
+    }
+
+    public static function swi_cartpol_sp_ptr(array $x, int $x_off, array &$l, int $l_off): void
+    {
+        PointerUtils::pointer2Fn($x, $l, $x_off, $l_off,
+            fn($xx, &$ll) => self::swi_cartpol_sp($xx, $ll),
+            6, 6);
+    }
+
+    public static function swi_polcart_ptr(array $l, int $l_off, array &$x, int $x_off): void
+    {
+        PointerUtils::pointer2Fn($l, $x, $l_off, $x_off,
+            fn($ll, &$xx) => self::swi_polcart($ll, $xx),
+            3, 3);
+    }
+
+    public static function swi_polcart_sp_ptr(array $l, int $l_off, array &$x, int $x_off): void
+    {
+        PointerUtils::pointer2Fn($l, $x, $l_off, $x_off,
+            fn($ll, &$xx) => self::swi_polcart_sp($ll, $xx),
+            6, 6);
     }
 }
