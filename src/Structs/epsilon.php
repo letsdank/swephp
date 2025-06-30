@@ -6,5 +6,5 @@ namespace Structs;
 class epsilon
 {
     // jd, eps, sin(eps), cos(eps)
-    public float $teps, $eps, $seps, $ceps;
+    public float $teps = 0, $eps = 0, $seps = 0, $ceps = 0;
 }
