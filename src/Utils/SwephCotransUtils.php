@@ -160,4 +160,93 @@ class SwephCotransUtils
         $x[1] = $xx[1];
         $x[2] = $xx[2];
     }
+
+    /**
+     * Coordinate transformation from ecliptic to the equator or vice-versa.
+     *
+     * @param array $xpo Array of 3 float for coordinates:
+     *  - 0: longitude
+     *  - 1: latitude
+     *  - 2: distance (unchanged, can be set to 1)
+     * @param array $xpn Return array of 3 float with values:
+     *  - 0: converted longitude
+     *  - 1: converted latitude
+     *  - 2: converted distance
+     * @param float $eps Obliquity of ecliptic, in degrees
+     * @return void
+     *
+     * @note For equatorial to ecliptical, obliquity must be positive. From ecliptical to
+     * equatorial, obliquity must be negative. Longitude, latitude and obliquity
+     * are in positive degrees.
+     */
+    public static function swe_cotrans(array $xpo, array &$xpn, float $eps): void
+    {
+        $e = $eps * SweConst::DEGTORAD;
+        for ($i = 0; $i <= 1; $i++)
+            $x[$i] = $xpo[$i];
+        $x[0] *= SweConst::DEGTORAD;
+        $x[1] *= SweConst::DEGTORAD;
+        $x[2] = 1;
+        for ($i = 3; $i <= 5; $i++)
+            $x[$i] = 0;
+        SwephCotransUtils::swi_polcart($x, $x);
+        SwephCotransUtils::swi_coortrf($x, $x, $e);
+        SwephCotransUtils::swi_cartpol($x, $x);
+        $xpn[0] = $x[0] * SweConst::RADTODEG;
+        $xpn[1] = $x[1] * SweConst::RADTODEG;
+        $xpn[2] = $xpo[2];
+    }
+
+    /**
+     * Coordinate transformation of position and speed, from ecliptic to the equator
+     * or vice-versa.
+     *
+     * @param array $xpo Array of 6 float for coordinates:
+     *  - 0: longitude
+     *  - 1: latitude
+     *  - 2: distance
+     *  - 3: longitude speed
+     *  - 4: latitude speed
+     *  - 5: distance speed
+     * @param array $xpn Return array of 6 float with values:
+     *  - 0: converted longitude
+     *  - 1: converted longitude speed
+     *  - 2: converted latitude
+     *  - 3: converted latitude speed
+     *  - 4: converted distance
+     *  - 5: converted distance speed
+     * @param float $eps Obliquity of ecliptic, in degrees
+     * @return void
+     *
+     * @note For equatorial to ecliptical, obliquity must be positive. From ecliptical to
+     * equatorial, obliquity must be negative. Longitude, latitude, their speeds
+     * and obliquity are in positive degrees.
+     */
+    public static function swe_cotrans_sp(array $xpo, array &$xpn, float $eps): void
+    {
+        $e = $eps * SweConst::DEGTORAD;
+        for ($i = 0; $i <= 5; $i++)
+            $x[$i] = $xpo[$i];
+        $x[0] *= SweConst::DEGTORAD;
+        $x[1] *= SweConst::DEGTORAD;
+        $x[2] = 1;          // avoids problems with polcart(), if x[2] = 0
+        $x[3] *= SweConst::DEGTORAD;
+        $x[4] *= SweConst::DEGTORAD;
+        SwephCotransUtils::swi_polcart_sp($x, $x);
+        SwephCotransUtils::swi_coortrf($x, $x, $e);
+        // TODO: - t[-_-t]
+        $xsp = [$x[3], $x[4], $x[5]];
+        SwephCotransUtils::swi_coortrf($xsp, $xsp, $e);
+        $x[3] = $xsp[0];
+        $x[4] = $xsp[1];
+        $x[5] = $xsp[2];
+        unset($xsp);
+        SwephCotransUtils::swi_cartpol_sp($x, $xpn);
+        $xpn[0] *= SweConst::RADTODEG;
+        $xpn[1] *= SweConst::RADTODEG;
+        $xpn[2] = $xpo[2];
+        $xpn[3] *= SweConst::RADTODEG;
+        $xpn[4] *= SweConst::RADTODEG;
+        $xpn[5] = $xpo[5];
+    }
 }

@@ -36,7 +36,7 @@ class swephlib_sidt
         // mean longitude of earth J2000
         $dlon = 100.46645683 + (1295977422.83429 * $t - 2.04411 * $t2 - 0.00523 * $t3) / 3600.0;
         // light time sun-earth
-        $dlon = $this->parent->swe_degnorm($dlon - $dlt * 360.0 / 365.2425);
+        $dlon = SwephLib::swe_degnorm($dlon - $dlt * 360.0 / 365.2425);
         $xs[0] = $dlon * SweConst::DEGTORAD;
         $xs[1] = 0;
         $xs[2] = 1;
@@ -65,7 +65,7 @@ class swephlib_sidt
         else
             $xs[0] += $nut * cos($eps * SweConst::DEGTORAD);
         // add hour
-        $xs[0] = $this->parent->swe_degnorm($xs[0] + $dhour);
+        $xs[0] = SwephLib::swe_degnorm($xs[0] + $dhour);
         $tsid = $xs[0] / 15;
         return $tsid;
     }
@@ -160,25 +160,25 @@ class swephlib_sidt
     function sidtime_non_polynomial_part(float $tt): float
     {
         // L Mean anomaly of the Moon.
-        $delm[0] = $this->parent->swe_radnorm(2.35555598 + 8328.6914269554 * $tt);
+        $delm[0] = SwephLib::swe_radnorm(2.35555598 + 8328.6914269554 * $tt);
         // LSU Mean anomaly of the Sun.
-        $delm[1] = $this->parent->swe_radnorm(6.24006013 + 628.301955 * $tt);
+        $delm[1] = SwephLib::swe_radnorm(6.24006013 + 628.301955 * $tt);
         // F Mean argument of the latitude of the Moon.
-        $delm[2] = $this->parent->swe_radnorm(1.627905234 + 8433.466158131 * $tt);
+        $delm[2] = SwephLib::swe_radnorm(1.627905234 + 8433.466158131 * $tt);
         // D Mean elongation of the Moon from the Sun.
-        $delm[3] = $this->parent->swe_radnorm(5.198466741 + 7771.3771468121 * $tt);
+        $delm[3] = SwephLib::swe_radnorm(5.198466741 + 7771.3771468121 * $tt);
         // OM Mean longitude of the ascending node of the Moon.
-        $delm[4] = $this->parent->swe_radnorm(2.18243920 - 33.757045 * $tt);
+        $delm[4] = SwephLib::swe_radnorm(2.18243920 - 33.757045 * $tt);
         // Planetary longitudes, Mercury through Neptune (Souchay et al. 1999).
         // LME, LVE, LEA, LMA, LJU, LSA, LUR, LNE
-        $delm[5] = $this->parent->swe_radnorm(4.402608842 + 2608.7903141574 * $tt);
-        $delm[6] = $this->parent->swe_radnorm(3.176146697 + 1021.3285546211 * $tt);
-        $delm[7] = $this->parent->swe_radnorm(1.753470314 + 628.3075849991 * $tt);
-        $delm[8] = $this->parent->swe_radnorm(6.203480913 + 334.0612426700 * $tt);
-        $delm[9] = $this->parent->swe_radnorm(0.599546497 + 52.9690962641 * $tt);
-        $delm[10] = $this->parent->swe_radnorm(0.874016757 + 21.3299104960 * $tt);
-        $delm[11] = $this->parent->swe_radnorm(5.481293871 + 7.4781598567 * $tt);
-        $delm[12] = $this->parent->swe_radnorm(5.321159000 + 3.8127774000 * $tt);
+        $delm[5] = SwephLib::swe_radnorm(4.402608842 + 2608.7903141574 * $tt);
+        $delm[6] = SwephLib::swe_radnorm(3.176146697 + 1021.3285546211 * $tt);
+        $delm[7] = SwephLib::swe_radnorm(1.753470314 + 628.3075849991 * $tt);
+        $delm[8] = SwephLib::swe_radnorm(6.203480913 + 334.0612426700 * $tt);
+        $delm[9] = SwephLib::swe_radnorm(0.599546497 + 52.9690962641 * $tt);
+        $delm[10] = SwephLib::swe_radnorm(0.874016757 + 21.3299104960 * $tt);
+        $delm[11] = SwephLib::swe_radnorm(5.481293871 + 7.4781598567 * $tt);
+        $delm[12] = SwephLib::swe_radnorm(5.321159000 + 3.8127774000 * $tt);
         // PA General accumulated precession in  longitude.
         $delm[13] = (0.02438175 + 0.00000538691 * $tt) * $tt;
         $dadd = -0.87 * sin($delm[4]) * $tt;

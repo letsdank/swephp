@@ -207,12 +207,12 @@ class swephlib_precess
         // ecliptic pole
         $this->pre_pecl($tjd, $pecl);
         // equinox
-        $this->parent->swi_cross_prod($peqr, $pecl, $v);
+        SwephLib::swi_cross_prod($peqr, $pecl, $v);
         $w = sqrt($v[0] * $v[0] + $v[1] * $v[1] + $v[2] * $v[2]);
         $eqx[0] = $v[0] / $w;
         $eqx[1] = $v[1] / $w;
         $eqx[2] = $v[2] / $w;
-        $this->parent->swi_cross_prod($peqr, $eqx, $v);
+        SwephLib::swi_cross_prod($peqr, $eqx, $v);
         $rp[0] = $eqx[0];
         $rp[1] = $eqx[1];
         $rp[2] = $eqx[2];

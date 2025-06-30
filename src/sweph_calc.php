@@ -548,7 +548,7 @@ class sweph_calc
             $retc = $this->swi_mean_node($tjd - Sweph::MEAN_NODE_SPEED_INTV, array_slice($xp2, 3), $serr);
             if ($retc == SweConst::ERR)
                 goto return_error;
-            $xp2[3] = $this->parent->getSwePhp()->swephLib->swe_difrad2n($xp2[0], $xp2[3]) / Sweph::MEAN_NODE_SPEED_INTV;
+            $xp2[3] = SwephLib::swe_difrad2n($xp2[0], $xp2[3]) / Sweph::MEAN_NODE_SPEED_INTV;
             $xp2[4] = $xp2[5] = 0;
             $ndp->teval = $tjd;
             $ndp->xflgs = -1;
@@ -588,7 +588,7 @@ class sweph_calc
             if ($retc == SweConst::ERR)
                 goto return_error;
             for ($i = 0; $i <= 1; $i++)
-                $xp2[3 + $i] = $this->parent->getSwePhp()->swephLib->swe_difrad2n($xp2[$i], $xp2[3 + $i]) / Sweph::MEAN_NODE_SPEED_INTV;
+                $xp2[3 + $i] = SwephLib::swe_difrad2n($xp2[$i], $xp2[3 + $i]) / Sweph::MEAN_NODE_SPEED_INTV;
             $xp2[5] = 0;
             $ndp->teval = $tjd;
             $ndp->xflgs = -1;
@@ -2158,56 +2158,56 @@ class sweph_calc
             if (($retflag = $this->swe_fixstar($star, $tjd_et, $iflag_true, $x, $serr)) == SweConst::ERR) {
                 return SweConst::ERR;
             }
-            $daya = $this->parent->getSwePhp()->swephLib->swe_degnorm($x[0] - 180);
+            $daya = SwephLib::swe_degnorm($x[0] - 180);
             return ($retflag & Sweph::SEFLG_EPHMASK);
         }
         if ($sid_mode == SweSiderealMode::SE_SIDM_TRUE_REVATI->value) {
             $star = ",zePsc"; // Revati
             if (($retflag = $this->swe_fixstar($star, $tjd_et, $iflag_true, $x, $serr)) == SweConst::ERR)
                 return SweConst::ERR;
-            $daya = $this->parent->getSwePhp()->swephLib->swe_degnorm($x[0] - 359.8333333333);
+            $daya = SwephLib::swe_degnorm($x[0] - 359.8333333333);
             return ($retflag & Sweph::SEFLG_EPHMASK);
         }
         if ($sid_mode == SweSiderealMode::SE_SIDM_TRUE_PUSHYA->value) {
             $star = ",deCnc"; // Pushya = Asellus Australis
             if (($retflag = $this->swe_fixstar($star, $tjd_et, $iflag_true, $x, $serr)) == SweConst::ERR)
                 return SweConst::ERR;
-            $daya = $this->parent->getSwePhp()->swephLib->swe_degnorm($x[0] - 106);
+            $daya = SwephLib::swe_degnorm($x[0] - 106);
             return ($retflag & Sweph::SEFLG_EPHMASK);
         }
         if ($sid_mode == SweSiderealMode::SE_SIDM_TRUE_SHEORAN->value) {
             $star = ",deCnc"; // Asellus Australis
             if (($retflag = $this->swe_fixstar($star, $tjd_et, $iflag_true, $x, $serr)) == SweConst::ERR)
                 return SweConst::ERR;
-            $daya = $this->parent->getSwePhp()->swephLib->swe_degnorm($x[0] - 103.49264221625);
+            $daya = SwephLib::swe_degnorm($x[0] - 103.49264221625);
             return ($retflag & Sweph::SEFLG_EPHMASK);
         }
         if ($sid_mode == SweSiderealMode::SE_SIDM_TRUE_MULA->value) {
             $star = ",laSco"; // Mula = lambda Scorpionis
             if (($retflag = $this->swe_fixstar($star, $tjd_et, $iflag_true, $x, $serr)) == SweConst::ERR)
                 return SweConst::ERR;
-            $daya = $this->parent->getSwePhp()->swephLib->swe_degnorm($x[0] - 240);
+            $daya = SwephLib::swe_degnorm($x[0] - 240);
             return ($retflag & Sweph::SEFLG_EPHMASK);
         }
         if ($sid_mode == SweSiderealMode::SE_SIDM_GALCENT_0SAG->value) {
             $star = ",SgrA*"; // Galactic Centre
             if (($retflag = $this->swe_fixstar($star, $tjd_et, $iflag_true, $x, $serr)) == SweConst::ERR)
                 return SweConst::ERR;
-            $daya = $this->parent->getSwePhp()->swephLib->swe_degnorm($x[0] - 240.0);
+            $daya = SwephLib::swe_degnorm($x[0] - 240.0);
             return ($retflag & Sweph::SEFLG_EPHMASK);
         }
         if ($sid_mode == SweSiderealMode::SE_SIDM_GALCENT_COCHRANE->value) {
             $star = ",ShrA*"; // Galactic Centre
             if (($retflag = $this->swe_fixstar($star, $tjd_et, $iflag_true, $x, $serr)) == SweConst::ERR)
                 return SweConst::ERR;
-            $daya = $this->parent->getSwePhp()->swephLib->swe_degnorm($x[0] - 270.0);
+            $daya = SwephLib::swe_degnorm($x[0] - 270.0);
             return ($retflag & Sweph::SEFLG_EPHMASK);
         }
         if ($sid_mode == SweSiderealMode::SE_SIDM_GALCENT_RGILBRAND->value) {
             $star = ",SgrA*"; // Galactic Centre
             if (($retflag = $this->swe_fixstar($star, $tjd_et, $iflag_true, $x, $serr)) == SweConst::ERR)
                 return SweConst::ERR;
-            $daya = $this->parent->getSwePhp()->swephLib->swe_degnorm($x[0] - 210.0 - 90.0 * 0.3819660113);
+            $daya = SwephLib::swe_degnorm($x[0] - 210.0 - 90.0 * 0.3819660113);
             return ($retflag & Sweph::SEFLG_EPHMASK);
         }
         if ($sid_mode == SweSiderealMode::SE_SIDM_GALCENT_MULA_WILHELM->value) {
@@ -2218,28 +2218,28 @@ class sweph_calc
                 return SweConst::ERR;
             $eps = $this->parent->getSwePhp()->swephLib->swi_epsiln($tjd_et, $iflag) * SweConst::RADTODEG;
             $daya = $this->swi_armc_to_mc($x[0], $eps);
-            $daya = $this->parent->getSwePhp()->swephLib->swe_degnorm($daya - 246.6666666667);
+            $daya = SwephLib::swe_degnorm($daya - 246.6666666667);
             return ($retflag & Sweph::SEFLG_EPHMASK);
         }
         if ($sid_mode == SweSiderealMode::SE_SIDM_GALEQU_IAU1958->value) {
             $star = ",GP1958"; // Galactic Pole IAU 1958
             if (($retflag = $this->swe_fixstar($star, $tjd_et, $iflag_galequ, $x, $serr)) == SweConst::ERR)
                 return SweConst::ERR;
-            $daya = $this->parent->getSwePhp()->swephLib->swe_degnorm($x[0] - 150);
+            $daya = SwephLib::swe_degnorm($x[0] - 150);
             return ($retflag & Sweph::SEFLG_EPHMASK);
         }
         if ($sid_mode == SweSiderealMode::SE_SIDM_GALEQU_TRUE->value) {
             $star = ",GPol"; // Galactic Pole modern, true
             if (($retflag = $this->swe_fixstar($star, $tjd_et, $iflag_galequ, $x, $serr)) == SweConst::ERR)
                 return SweConst::ERR;
-            $daya = $this->parent->getSwePhp()->swephLib->swe_degnorm($x[0] - 150);
+            $daya = SwephLib::swe_degnorm($x[0] - 150);
             return ($retflag & Sweph::SEFLG_EPHMASK);
         }
         if ($sid_mode == SweSiderealMode::SE_SIDM_GALEQU_MULA->value) {
             $star = ",GPol"; // Galactic Pole modern, true
             if (($retflag = $this->swe_fixstar($star, $tjd_et, $iflag_galequ, $x, $serr)) == SweConst::ERR)
                 return SweConst::ERR;
-            $daya = $this->parent->getSwePhp()->swephLib->swe_degnorm($x[0] - 150 - 6.6666666667);
+            $daya = SwephLib::swe_degnorm($x[0] - 150 - 6.6666666667);
             return ($retflag & Sweph::SEFLG_EPHMASK);
         }
         if (!($sip->sid_mode & SweConst::SE_SIDBIT_ECL_DATE)) {
@@ -2281,7 +2281,7 @@ class sweph_calc
             // relative to the ecliptic of date.
             //
             // at t0, we have ayanamsha sip->ayan_t0
-            $x[0] = $this->parent->getSwePhp()->swephLib->swe_degnorm($sip->ayan_t0) * SweConst::DEGTORAD;
+            $x[0] = SwephLib::swe_degnorm($sip->ayan_t0) * SweConst::DEGTORAD;
             $x[1] = 0;
             $x[2] = 1;
             // get position for t0
@@ -2302,11 +2302,11 @@ class sweph_calc
             // to polar
             SwephCotransUtils::swi_coortrf($x, $x, $eps);
             SwephCotransUtils::swi_cartpol($x, $x);
-            $x[0] = $this->parent->getSwePhp()->swephLib->swe_degnorm($x[0] * SweConst::RADTODEG);
+            $x[0] = SwephLib::swe_degnorm($x[0] * SweConst::RADTODEG);
         }
         $this->get_aya_correction($iflag, $corr, $serr);
         // get ayanamsa
-        $daya = $this->parent->getSwePhp()->swephLib->swe_degnorm($x[0] - $corr);
+        $daya = SwephLib::swe_degnorm($x[0] - $corr);
         return $iflag;
     }
 
@@ -2383,7 +2383,7 @@ class sweph_calc
         // subtract ayan_t0
         $this->get_aya_correction($iflag, $corr, null);
         $x[0] -= $sip->ayan_t0 * SweConst::DEGTORAD;
-        $x[0] = $this->parent->getSwePhp()->swephLib->swe_radnorm($x[0] + $corr * SweConst::DEGTORAD);
+        $x[0] = SwephLib::swe_radnorm($x[0] + $corr * SweConst::DEGTORAD);
         // back to cartesian
         SwephCotransUtils::swi_polcart_sp($x, $xout);
         return SweConst::OK;
@@ -2448,7 +2448,7 @@ class sweph_calc
         // subtract ayan_t0
         $this->get_aya_correction($iflag, $corr, null);
         $x[0] -= $sip->ayan_t0;
-        $x[0] = $this->parent->getSwePhp()->swephLib->swe_degnorm($x[0] + $corr) * SweConst::DEGTORAD;
+        $x[0] = SwephLib::swe_degnorm($x[0] + $corr) * SweConst::DEGTORAD;
         // back to cartesian
         SwephCotransUtils::swi_polcart_sp($x, $xout);
         return SweConst::OK;
@@ -3943,8 +3943,7 @@ class sweph_calc
             $cosnode = $xx[$i][0] / $rxy;
             $sinnode = $xx[$i][1] / $rxy;
             // inclination
-            $this->parent->getSwePhp()->swephLib->swi_cross_prod($xpos[$i],
-                array_values(array_slice($xpos[$i], 3)), $xnorm);
+            SwephLib::swi_cross_prod($xpos[$i], array_values(array_slice($xpos[$i], 3)), $xnorm);
             $rxy = $xnorm[0] * $xnorm[0] + $xnorm[1] * $xnorm[1];
             $c2 = ($rxy + $xnorm[2] * $xnorm[2]);
             $rxyz = sqrt($c2);
@@ -3969,7 +3968,7 @@ class sweph_calc
             // true anomaly
             $ny = 2 * atan(sqrt((1 + $ecce) / (1 - $ecce)) * $sinE / (1 + $cosE));
             // distance of apogee from ascending node
-            $xxa[$i][0] = $this->parent->getSwePhp()->swephLib->swi_mod2PI($uu - $ny + M_PI);
+            $xxa[$i][0] = SwephLib::swi_mod2PI($uu - $ny + M_PI);
             $xxa[$i][1] = 0;                        // latitude
             $xxa[$i][2] = $sema * (1 + $ecce);      // distance
             // transformation to ecliptic coordinates
@@ -3981,7 +3980,7 @@ class sweph_calc
             SwephCotransUtils::swi_polcart($xxa[$i], $xxa[$i]);
             // new distance of node from orbital ellipse:
             // true anomaly of node:
-            $ny = $this->parent->getSwePhp()->swephLib->swi_mod2PI($ny - $uu);
+            $ny = SwephLib::swi_mod2PI($ny - $uu);
             // eccentric anomaly
             $cosE = cos(2 * atan(tan($ny / 2) / sqrt((1 + $ecce) / (1 - $ecce))));
             // new distance
@@ -4217,8 +4216,8 @@ class sweph_calc
                 $ndp->xreturn[$i + 12] *= SweConst::RADTODEG;       // equator
                 $ndp->xreturn[$i + 15] *= SweConst::RADTODEG;
             }
-            $ndp->xreturn[0] = $this->parent->getSwePhp()->swephLib->swe_degnorm($ndp->xreturn[0]);
-            $ndp->xreturn[12] = $this->parent->getSwePhp()->swephLib->swe_degnorm($ndp->xreturn[12]);
+            $ndp->xreturn[0] = SwephLib::swe_degnorm($ndp->xreturn[0]);
+            $ndp->xreturn[12] = SwephLib::swe_degnorm($ndp->xreturn[12]);
         }
         return SweConst::OK;
     }

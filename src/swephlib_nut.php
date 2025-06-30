@@ -219,25 +219,25 @@ class swephlib_nut
         // on the ecliptic, measured from the mean equinox of date
         //
         $OM = -6962890.539 * $T + 450160.280 + (0.008 * $T + 7.455) * $T2;
-        $OM = $this->parent->swe_degnorm($OM / 3600) * SweConst::DEGTORAD;
+        $OM = SwephLib::swe_degnorm($OM / 3600) * SweConst::DEGTORAD;
         // mean longitude of the Sun minus the
         // mean longitude of the Sun's perigee
         //
         $MS = 129596581.224 * $T + 1287099.804 - (0.012 * $T + 0.577) * $T2;
-        $MS = $this->parent->swe_degnorm($MS / 3600) * SweConst::DEGTORAD;
+        $MS = SwephLib::swe_degnorm($MS / 3600) * SweConst::DEGTORAD;
         // mean longitude of the Moon minus the
         // mean longitude of the Moon's perigee
         //
         $MM = 1717915922.633 * $T + 485866.733 + (0.064 * $T + 31.310) * $T2;
-        $MM = $this->parent->swe_degnorm($MM / 3600) * SweConst::DEGTORAD;
+        $MM = SwephLib::swe_degnorm($MM / 3600) * SweConst::DEGTORAD;
         // mean longitude of the Moon minus the
         // mean longitude of the Moon's node
         $FF = 1739527263.137 * $T + 335778.877 + (0.011 * $T - 13.257) * $T2;
-        $FF = $this->parent->swe_degnorm($FF / 3600) * SweConst::DEGTORAD;
+        $FF = SwephLib::swe_degnorm($FF / 3600) * SweConst::DEGTORAD;
         // mean elongation of the Moon from the Sun.
         //
         $DD = 1602961601.328 * $T + 1072261.307 + (0.019 * $T - 6.891) * $T2;
-        $DD = $this->parent->swe_degnorm($DD / 3600) * SweConst::DEGTORAD;
+        $DD = SwephLib::swe_degnorm($DD / 3600) * SweConst::DEGTORAD;
         $args[0] = $MM;
         $ns[0] = 3;
         $args[1] = $MS;
@@ -384,31 +384,31 @@ class swephlib_nut
         // luni-solar nutation
         // Fundamental arguments, Simon & al. (1994)
         // Mean anomaly of the Moon.
-        $M = $this->parent->swe_degnorm((485868.249036 +
+        $M = SwephLib::swe_degnorm((485868.249036 +
                     $T * (1717915923.2178 +
                         $T * (31.8792 +
                             $T * (0.051635 +
                                 $T * (-0.00024470))))) / 3600.0) * SweConst::DEGTORAD;
         // Mean anomaly of the Sun
-        $SM = $this->parent->swe_degnorm((1287104.79305 +
+        $SM = SwephLib::swe_degnorm((1287104.79305 +
                     $T * (129596581.0481 +
                         $T * (-0.5532 +
                             $T * (0.000136 +
                                 $T * (-0.00001149))))) / 3600.0) * SweConst::DEGTORAD;
         // Mean argument of the latitude of the Moon.
-        $F = $this->parent->swe_degnorm((335779.526232 +
+        $F = SwephLib::swe_degnorm((335779.526232 +
                     $T * (1739527262.8478 +
                         $T * (-12.7512 +
                             $T * (-0.001037 +
                                 $T * (0.00000417))))) / 3600.0) * SweConst::DEGTORAD;
         // Mean elongation of the Moon from the Sun.
-        $D = $this->parent->swe_degnorm((1072260.70369 +
+        $D = SwephLib::swe_degnorm((1072260.70369 +
                     $T * (1602961601.2090 +
                         $T * (-6.3706 +
                             $T * (0.006593 +
                                 $T * (-0.00003169))))) / 3600.0) * SweConst::DEGTORAD;
         // Mean longitude of the ascending node of the Moon.
-        $OM = $this->parent->swe_degnorm((450160.398036 +
+        $OM = SwephLib::swe_degnorm((450160.398036 +
                     $T * (-6962890.5431 +
                         $T * (7.4722 +
                             $T * (0.007702 +
@@ -420,7 +420,7 @@ class swephlib_nut
             $inls = swenut2000a::NLS;
         for ($i = $inls - 1; $i >= 0; $i--) {
             $j = $i * 5;
-            $darg = $this->parent->swe_degnorm((float)swenut2000a::nls[$j] * $M +
+            $darg = SwephLib::swe_degnorm((float)swenut2000a::nls[$j] * $M +
                 (float)swenut2000a::nls[$j + 1] * $SM +
                 (float)swenut2000a::nls[$j + 2] * $F +
                 (float)swenut2000a::nls[$j + 3] * $D +
@@ -442,24 +442,24 @@ class swephlib_nut
             // cases leads to negligible changes, well below 0.1 microarcsecond.
 
             // Mean anomaly of the Moon.
-            $AL = $this->parent->swe_radnorm(2.35555598 + 8328.6914269554 * $T);
+            $AL = SwephLib::swe_radnorm(2.35555598 + 8328.6914269554 * $T);
             // Mean anomaly of the Sun.
-            $ALSU = $this->parent->swe_radnorm(6.24006013 + 628.301955 * $T);
+            $ALSU = SwephLib::swe_radnorm(6.24006013 + 628.301955 * $T);
             // Mean argument of the latitude of the Moon.
-            $AF = $this->parent->swe_radnorm(1.627905234 + 8433.466158131 * $T);
+            $AF = SwephLib::swe_radnorm(1.627905234 + 8433.466158131 * $T);
             // Mean elongation of the Moon from the Sun.
-            $AD = $this->parent->swe_radnorm(5.198466741 + 7771.3771468121 * $T);
+            $AD = SwephLib::swe_radnorm(5.198466741 + 7771.3771468121 * $T);
             // Mean longitude of the ascending node of the Moon.
-            $AOM = $this->parent->swe_radnorm(2.18243920 - 33.757045 * $T);
+            $AOM = SwephLib::swe_radnorm(2.18243920 - 33.757045 * $T);
             // Planetary longitudes, Mercury through Neptune (Souchay et al. 1999).
-            $ALME = $this->parent->swe_radnorm(4.402608842 + 2608.7903141574 * $T);
-            $ALVE = $this->parent->swe_radnorm(3.176146697 + 1021.3285546211 * $T);
-            $ALEA = $this->parent->swe_radnorm(1.753470314 + 628.3075849991 * $T);
-            $ALMA = $this->parent->swe_radnorm(6.203480913 + 334.0612426700 * $T);
-            $ALJU = $this->parent->swe_radnorm(0.599546497 + 52.9690962641 * $T);
-            $ALSA = $this->parent->swe_radnorm(0.874016757 + 21.3299104960 * $T);
-            $ALUR = $this->parent->swe_radnorm(5.481293871 + 7.4781598567 * $T);
-            $ALNE = $this->parent->swe_radnorm(5.321159000 + 3.8127774000 * $T);
+            $ALME = SwephLib::swe_radnorm(4.402608842 + 2608.7903141574 * $T);
+            $ALVE = SwephLib::swe_radnorm(3.176146697 + 1021.3285546211 * $T);
+            $ALEA = SwephLib::swe_radnorm(1.753470314 + 628.3075849991 * $T);
+            $ALMA = SwephLib::swe_radnorm(6.203480913 + 334.0612426700 * $T);
+            $ALJU = SwephLib::swe_radnorm(0.599546497 + 52.9690962641 * $T);
+            $ALSA = SwephLib::swe_radnorm(0.874016757 + 21.3299104960 * $T);
+            $ALUR = SwephLib::swe_radnorm(5.481293871 + 7.4781598567 * $T);
+            $ALNE = SwephLib::swe_radnorm(5.321159000 + 3.8127774000 * $T);
             // General accumulated precession in longitude.
             $APA = (0.02438175 + 0.00000538691 * $T) * $T;
             // planetary nutation series (in reverse order).
@@ -467,7 +467,7 @@ class swephlib_nut
             $deps = 0;
             for ($i = swenut2000a::NPL - 1; $i >= 0; $i--) {
                 $j = $i * 14;
-                $darg = $this->parent->swe_radnorm((float)swenut2000a::npl[$j] * $AL +
+                $darg = SwephLib::swe_radnorm((float)swenut2000a::npl[$j] * $AL +
                     (float)swenut2000a::npl[$j + 1] * $ALSU +
                     (float)swenut2000a::npl[$j + 2] * $AF +
                     (float)swenut2000a::npl[$j + 3] * $AD +
