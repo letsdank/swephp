@@ -91,7 +91,7 @@ class SweJPL extends SweModule
      * set to a fixed value depending as in previous releases. The caller of
      * fsizer() will verify by data comparison whether it computed correctly.
      */
-    static ?jpl_save $js;
+    static ?jpl_save $js = null;
 
     function fsizer(?string &$serr = null): int
     {
