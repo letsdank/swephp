@@ -5,6 +5,7 @@ use Enums\SweModelPrecession;
 use Enums\SweModelSidereal;
 use Enums\SweSiderealMode;
 use Enums\SweTidalAccel;
+use Utils\SwephCotransUtils;
 
 class SwephLib extends SweModule
 {
@@ -12,7 +13,6 @@ class SwephLib extends SweModule
     const float SE_DELTAT_AUTOMATIC = -1E-10;
 
     private swephlib_deltat $deltat;
-    private swephlib_cotrans $cotrans;
     private swephlib_precess $precess;
     private swephlib_nut $nut;
     private swephlib_sidt $sidt;
@@ -21,7 +21,6 @@ class SwephLib extends SweModule
     {
         parent::__construct($base);
         $this->deltat = new swephlib_deltat($this);
-        $this->cotrans = new swephlib_cotrans($this);
         $this->precess = new swephlib_precess($this);
         $this->nut = new swephlib_nut($this);
         $this->sidt = new swephlib_sidt($this);
@@ -137,9 +136,9 @@ class SwephLib extends SweModule
         $x[2] = 1;
         for ($i = 3; $i <= 5; $i++)
             $x[$i] = 0;
-        $this->cotrans->swi_polcart($x, $x);
-        $this->cotrans->swi_coortrf($x, $x, $e);
-        $this->cotrans->swi_cartpol($x, $x);
+        SwephCotransUtils::swi_polcart($x, $x);
+        SwephCotransUtils::swi_coortrf($x, $x, $e);
+        SwephCotransUtils::swi_cartpol($x, $x);
         $xpn[0] = $x[0] * SweConst::RADTODEG;
         $xpn[1] = $x[1] * SweConst::RADTODEG;
         $xpn[2] = $xpo[2];
@@ -180,16 +179,16 @@ class SwephLib extends SweModule
         $x[2] = 1;          // avoids problems with polcart(), if x[2] = 0
         $x[3] *= SweConst::DEGTORAD;
         $x[4] *= SweConst::DEGTORAD;
-        $this->cotrans->swi_polcart_sp($x, $x);
-        $this->cotrans->swi_coortrf($x, $x, $e);
+        SwephCotransUtils::swi_polcart_sp($x, $x);
+        SwephCotransUtils::swi_coortrf($x, $x, $e);
         // TODO: - t[-_-t]
         $xsp = [$x[3], $x[4], $x[5]];
-        $this->cotrans->swi_coortrf($xsp, $xsp, $e);
+        SwephCotransUtils::swi_coortrf($xsp, $xsp, $e);
         $x[3] = $xsp[0];
         $x[4] = $xsp[1];
         $x[5] = $xsp[2];
         unset($xsp);
-        $this->cotrans->swi_cartpol_sp($x, $xpn);
+        SwephCotransUtils::swi_cartpol_sp($x, $xpn);
         $xpn[0] *= SweConst::RADTODEG;
         $xpn[1] *= SweConst::RADTODEG;
         $xpn[2] = $xpo[2];
@@ -655,23 +654,23 @@ class SwephLib extends SweModule
         // with zero speed, we assume that it should be really zero
         if ($xp[3] == 0)
             $correct_speed = false;
-        $this->cotrans->swi_cartpol_sp($xp, $xp);
+        SwephCotransUtils::swi_cartpol_sp($xp, $xp);
         // according to Expl.Suppl., p. 167f.
         $xp[0] += (0.035 + 0.085 * ($tjd - Sweph::B1950) / 36524.2198782) / 3600 * 15 * SweConst::DEGTORAD;
         if ($correct_speed)
             $xp[3] += (0.085 / 36524.2198782) / 3600 * 15 * SweConst::DEGTORAD;
-        $this->cotrans->swi_polcart_sp($xp, $xp);
+        SwephCotransUtils::swi_polcart_sp($xp, $xp);
     }
 
     function swi_FK5_FK4(array &$xp, float $tjd): void
     {
         if ($xp[0] == 0 && $xp[1] == 0 && $xp[2] == 0)
             return;
-        $this->cotrans->swi_cartpol_sp($xp, $xp);
+        SwephCotransUtils::swi_cartpol_sp($xp, $xp);
         // according to Expl.Suppl., p. 167f.
         $xp[0] -= (0.035 + 0.085 * ($tjd - Sweph::B1950) / 36524.2198782) / 3600 * 15 * SweConst::DEGTORAD;
         $xp[3] -= (0.085 / 36524.2198782) / 3600 * 15 * SweConst::DEGTORAD;
-        $this->cotrans->swi_polcart_sp($xp, $xp);
+        SwephCotransUtils::swi_polcart_sp($xp, $xp);
     }
 
     // TODO: Need to implement:
@@ -690,38 +689,6 @@ class SwephLib extends SweModule
     //////////////////////////////////////////////////
     // Placeholders used for private classes
     //////////////////////////////////////////////////
-
-    // cotrans
-
-    function swi_cartpol(array $x, array &$l): void
-    {
-        $this->cotrans->swi_cartpol($x, $l);
-    }
-
-    function swi_cartpol_sp(array $x, array &$l): void
-    {
-        $this->cotrans->swi_cartpol_sp($x, $l);
-    }
-
-    function swi_polcart(array $l, array &$x): void
-    {
-        $this->cotrans->swi_polcart($l, $x);
-    }
-
-    function swi_polcart_sp(array $l, array &$x): void
-    {
-        $this->cotrans->swi_polcart_sp($l, $x);
-    }
-
-    function swi_coortrf(array $xpo, array &$xpn, float $eps): void
-    {
-        $this->cotrans->swi_coortrf($xpo, $xpn, $eps);
-    }
-
-    function swi_coortrf2(array $xpo, array &$xpn, float $sineps, float $coseps): void
-    {
-        $this->cotrans->swi_coortrf2($xpo, $xpn, $sineps, $coseps);
-    }
 
     // precess
 

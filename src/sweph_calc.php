@@ -10,6 +10,7 @@ use Structs\nut;
 use Structs\plan_data;
 use Structs\save_positions;
 use Utils\ArrayUtils;
+use Utils\SwephCotransUtils;
 
 class sweph_calc
 {
@@ -2000,23 +2001,23 @@ class sweph_calc
          * with sidereal calc. this will be overwritten *
          * afterwards.                                  *
          ************************************************/
-        $this->parent->getSwePhp()->swephLib->swi_coortrf2($xx, $xx, $oe->seps, $oe->ceps);
+        SwephCotransUtils::swi_coortrf2($xx, $xx, $oe->seps, $oe->ceps);
         if ($iflag & SweConst::SEFLG_SPEED) {
             // TODO: - t[-_-t]
             $xxo = [$xx[3], $xx[4], $xx[5]];
-            $this->parent->getSwePhp()->swephLib->swi_coortrf2($xxo, $xxo, $oe->seps, $oe->ceps);
+            SwephCotransUtils::swi_coortrf2($xxo, $xxo, $oe->seps, $oe->ceps);
             $xx[3] = $xxo[0];
             $xx[4] = $xxo[1];
             $xx[5] = $xxo[2];
         }
         if (!($iflag & SweConst::SEFLG_NONUT)) {
-            $this->parent->getSwePhp()->swephLib->swi_coortrf2($xx, $xx,
+            SwephCotransUtils::swi_coortrf2($xx, $xx,
                 $this->parent->getSwePhp()->swed->nut->snut,
                 $this->parent->getSwePhp()->swed->nut->cnut);
             if ($iflag & SweConst::SEFLG_SPEED) {
                 // TODO: - t[-_-t]
                 $xxo = [$xx[3], $xx[4], $xx[5]];
-                $this->parent->getSwePhp()->swephLib->swi_coortrf2($xxo, $xxo,
+                SwephCotransUtils::swi_coortrf2($xxo, $xxo,
                     $this->parent->getSwePhp()->swed->nut->snut,
                     $this->parent->getSwePhp()->swed->nut->cnut);
                 $xx[3] = $xxo[0];
@@ -2067,8 +2068,7 @@ class sweph_calc
                 $pdp->xreturn[11] = $lonx1[5];
             } else {
                 // traditional algorithm
-                $this->parent->getSwePhp()->swephLib->swi_cartpol_sp(
-                    array_values(array_slice($pdp->xreturn, 6)), $pdp->xreturn);
+                SwephCotransUtils::swi_cartpol_sp(array_values(array_slice($pdp->xreturn, 6)), $pdp->xreturn);
                 // note, swi_get_ayanamsa_ex() disturbs present calculation, if sun is calculated with
                 // TRUE_CHITRA ayanamsha, because the ayanamsha also calculates the sun.
                 // Therefore current values are saved...
@@ -2083,7 +2083,7 @@ class sweph_calc
                 $pdp->xreturn[3] -= $daya[1] * SweConst::DEGTORAD;
                 // TODO: - t[-_-t]
                 $xro = array_values(array_slice($pdp->xreturn, 6));
-                $this->parent->getSwePhp()->swephLib->swi_polcart_sp($pdp->xreturn, $xro);
+                SwephCotransUtils::swi_polcart_sp($pdp->xreturn, $xro);
                 for ($i = 0; $i <= 5; $i++) $pdp->xreturn[6 + $i] = $xro[$i];
             }
         }
@@ -2092,11 +2092,9 @@ class sweph_calc
          ************************************************/
         // TODO: - t[-_-t]
         $xro = array_values(array_slice($pdp->xreturn, 12));
-        $this->parent->getSwePhp()->swephLib->swi_cartpol_sp(
-            array_values(array_slice($pdp->xreturn, 18)), $xro);
+        SwephCotransUtils::swi_cartpol_sp(array_values(array_slice($pdp->xreturn, 18)), $xro);
         for ($i = 0; $i <= 5; $i++) $pdp->xreturn[12 + $i] = $xro[$i];
-        $this->parent->getSwePhp()->swephLib->swi_cartpol_sp(
-            array_values(array_slice($pdp->xreturn, 6)), $pdp->xreturn);
+        SwephCotransUtils::swi_cartpol_sp(array_values(array_slice($pdp->xreturn, 6)), $pdp->xreturn);
         /**********************
          * radians to degrees *
          **********************/
@@ -2271,9 +2269,9 @@ class sweph_calc
             $this->parent->getSwePhp()->swephLib->swi_precess($x, $t0, 0, SweConst::J2000_TO_J);
             // to ecliptic t0
             $eps = $this->parent->getSwePhp()->swephLib->swi_epsiln($t0, 0);
-            $this->parent->getSwePhp()->swephLib->swi_coortrf($x, $x, $eps);
+            SwephCotransUtils::swi_coortrf($x, $x, $eps);
             // to polar
-            $this->parent->getSwePhp()->swephLib->swi_cartpol($x, $x);
+            SwephCotransUtils::swi_cartpol($x, $x);
             // subtract initial value of ayanamsa
             $x[0] = -$x[0] * SweConst::RADTODEG + $sip->ayan_t0;
         } else {
@@ -2292,8 +2290,8 @@ class sweph_calc
                 $t0 += $this->parent->getSwePhp()->swephLib->swe_deltat_ex($t0, $iflag, $serr);
             $eps = $this->parent->getSwePhp()->swephLib->swi_epsiln($t0, 0);
             // to polar equatorial relative to equinox t0
-            $this->parent->getSwePhp()->swephLib->swi_polcart($x, $x);
-            $this->parent->getSwePhp()->swephLib->swi_coortrf($x, $x, -$eps);
+            SwephCotransUtils::swi_polcart($x, $x);
+            SwephCotransUtils::swi_coortrf($x, $x, -$eps);
             // precess to J2000
             if ($t0 != Sweph::J2000)
                 $this->parent->getSwePhp()->swephLib->swi_precess($x, $t0, 0, SweConst::J_TO_J2000);
@@ -2302,8 +2300,8 @@ class sweph_calc
             // epsilon of date
             $eps = $this->parent->getSwePhp()->swephLib->swi_epsiln($tjd_et, 0);
             // to polar
-            $this->parent->getSwePhp()->swephLib->swi_coortrf($x, $x, $eps);
-            $this->parent->getSwePhp()->swephLib->swi_cartpol($x, $x);
+            SwephCotransUtils::swi_coortrf($x, $x, $eps);
+            SwephCotransUtils::swi_cartpol($x, $x);
             $x[0] = $this->parent->getSwePhp()->swephLib->swe_degnorm($x[0] * SweConst::RADTODEG);
         }
         $this->get_aya_correction($iflag, $corr, $serr);
@@ -2371,23 +2369,23 @@ class sweph_calc
         for ($i = 0; $i <= 5; $i++)
             $xoutr[$i] = $x[$i];
         $this->calc_epsilon($this->parent->getSwePhp()->swed->sidd->t0, $iflag, $oectmp);
-        $this->parent->getSwePhp()->swephLib->swi_coortrf2($x, $x, $oectmp->seps, $oectmp->ceps);
+        SwephCotransUtils::swi_coortrf2($x, $x, $oectmp->seps, $oectmp->ceps);
         if ($iflag & SweConst::SEFLG_SPEED) {
             // TODO: - t[-_-t]
             $xo = [$x[3], $x[4], $x[5]];
-            $this->parent->getSwePhp()->swephLib->swi_coortrf2($xo, $xo, $oectmp->seps, $oectmp->ceps);
+            SwephCotransUtils::swi_coortrf2($xo, $xo, $oectmp->seps, $oectmp->ceps);
             $x[3] = $xo[0];
             $x[4] = $xo[1];
             $x[5] = $xo[2];
         }
         // to polar coordinates
-        $this->parent->getSwePhp()->swephLib->swi_cartpol_sp($x, $x);
+        SwephCotransUtils::swi_cartpol_sp($x, $x);
         // subtract ayan_t0
         $this->get_aya_correction($iflag, $corr, null);
         $x[0] -= $sip->ayan_t0 * SweConst::DEGTORAD;
         $x[0] = $this->parent->getSwePhp()->swephLib->swe_radnorm($x[0] + $corr * SweConst::DEGTORAD);
         // back to cartesian
-        $this->parent->getSwePhp()->swephLib->swi_polcart_sp($x, $xout);
+        SwephCotransUtils::swi_polcart_sp($x, $xout);
         return SweConst::OK;
     }
 
@@ -2406,28 +2404,28 @@ class sweph_calc
         for ($i = 0; $i <= 5; $i++)
             $x[$i] = $xin[$i];
         // planet to ecliptic 2000
-        $this->parent->getSwePhp()->swephLib->swi_coortrf2($x, $x, $oe->seps, $oe->ceps);
+        SwephCotransUtils::swi_coortrf2($x, $x, $oe->seps, $oe->ceps);
         if ($iflag & SweConst::SEFLG_SPEED) {
             // TODO: - t[-_-t]
             $xo = [$x[3], $x[4], $x[5]];
-            $this->parent->getSwePhp()->swephLib->swi_coortrf2($xo, $xo, $oe->seps, $oe->ceps);
+            SwephCotransUtils::swi_coortrf2($xo, $xo, $oe->seps, $oe->ceps);
             $x[3] = $xo[0];
             $x[4] = $xo[1];
             $x[5] = $xo[2];
         }
         // to polar coordinates
-        $this->parent->getSwePhp()->swephLib->swi_cartpol_sp($x, $x);
+        SwephCotransUtils::swi_cartpol_sp($x, $x);
         // to solar system equator
         $x[0] -= $plane_node;
-        $this->parent->getSwePhp()->swephLib->swi_polcart_sp($x, $x);
-        $this->parent->getSwePhp()->swephLib->swi_coortrf($x, $x, $plane_incl);
+        SwephCotransUtils::swi_polcart_sp($x, $x);
+        SwephCotransUtils::swi_coortrf($x, $x, $plane_incl);
         // TODO: - t[-_-t]
         $xo = [$x[3], $x[4], $x[5]];
-        $this->parent->getSwePhp()->swephLib->swi_coortrf($xo, $xo, $plane_incl);
+        SwephCotransUtils::swi_coortrf($xo, $xo, $plane_incl);
         $x[3] = $xo[0];
         $x[4] = $xo[1];
         $x[5] = $xo[2];
-        $this->parent->getSwePhp()->swephLib->swi_cartpol_sp($x, $x);
+        SwephCotransUtils::swi_cartpol_sp($x, $x);
         // zero point of t0 in J2000 system
         $x0[0] = 1;
         $x0[1] = $x0[2] = 0;
@@ -2436,14 +2434,14 @@ class sweph_calc
             $this->parent->getSwePhp()->swephLib->swi_precess($x0, $sip->t0, 0, SweConst::J_TO_J2000);
         }
         // zero point to ecliptic 2000
-        $this->parent->getSwePhp()->swephLib->swi_coortrf2($x0, $x0, $oe->seps, $oe->ceps);
+        SwephCotransUtils::swi_coortrf2($x0, $x0, $oe->seps, $oe->ceps);
         // to polar coordinates
-        $this->parent->getSwePhp()->swephLib->swi_cartpol($x0, $x0);
+        SwephCotransUtils::swi_cartpol($x0, $x0);
         // to solar system equator
         $x0[0] -= $plane_node;
-        $this->parent->getSwePhp()->swephLib->swi_polcart($x0, $x0);
-        $this->parent->getSwePhp()->swephLib->swi_coortrf($x0, $x0, $plane_incl);
-        $this->parent->getSwePhp()->swephLib->swi_cartpol($x0, $x0);
+        SwephCotransUtils::swi_polcart($x0, $x0);
+        SwephCotransUtils::swi_coortrf($x0, $x0, $plane_incl);
+        SwephCotransUtils::swi_cartpol($x0, $x0);
         // measure planet from zero point
         $x[0] -= $x0[0];
         $x[0] *= SweConst::RADTODEG;
@@ -2452,7 +2450,7 @@ class sweph_calc
         $x[0] -= $sip->ayan_t0;
         $x[0] = $this->parent->getSwePhp()->swephLib->swe_degnorm($x[0] + $corr) * SweConst::DEGTORAD;
         // back to cartesian
-        $this->parent->getSwePhp()->swephLib->swi_polcart_sp($x, $xout);
+        SwephCotransUtils::swi_polcart_sp($x, $xout);
         return SweConst::OK;
     }
 
@@ -2672,14 +2670,14 @@ class sweph_calc
         $xx[4] = $xo[1];
         $xx[5] = $xo[2];
         // then add 0.137"/day
-        $this->parent->getSwePhp()->swephLib->swi_coortrf2($xx, $xx, $oe->seps, $oe->ceps);
+        SwephCotransUtils::swi_coortrf2($xx, $xx, $oe->seps, $oe->ceps);
         // TODO: - t[-_-t]
         $xo = [$xx[3], $xx[4], $xx[5]];
-        $this->parent->getSwePhp()->swephLib->swi_coortrf2($xo, $xo, $oe->seps, $oe->ceps);
+        SwephCotransUtils::swi_coortrf2($xo, $xo, $oe->seps, $oe->ceps);
         $xx[3] = $xo[0];
         $xx[4] = $xo[1];
         $xx[5] = $xo[2];
-        $this->parent->getSwePhp()->swephLib->swi_cartpol_sp($xx, $xx);
+        SwephCotransUtils::swi_cartpol_sp($xx, $xx);
         if ($prec_model == SweModelPrecession::MOD_PREC_VONDRAK_2011) {
             $this->parent->getSwePhp()->swephLib->swi_ldp_peps($t, $dpre);
             $this->parent->getSwePhp()->swephLib->swi_ldp_peps($t + 1, $dpre2);
@@ -2688,11 +2686,11 @@ class sweph_calc
             // formula from Montenbruck, German 1994, p. 18
             $xx[3] += (50.290966 + 0.0222226 * $tprec) / 3600 / 365.25 * SweConst::DEGTORAD * $fac;
         }
-        $this->parent->getSwePhp()->swephLib->swi_polcart_sp($xx, $xx);
-        $this->parent->getSwePhp()->swephLib->swi_coortrf2($xx, $xx, -$oe->seps, $oe->ceps);
+        SwephCotransUtils::swi_polcart_sp($xx, $xx);
+        SwephCotransUtils::swi_coortrf2($xx, $xx, -$oe->seps, $oe->ceps);
         // TODO: - t[-_-t]
         $xo = [$xx[3], $xx[4], $xx[5]];
-        $this->parent->getSwePhp()->swephLib->swi_coortrf2($xo, $xo, -$oe->seps, $oe->ceps);
+        SwephCotransUtils::swi_coortrf2($xo, $xo, -$oe->seps, $oe->ceps);
         $xx[3] = $xo[0];
         $xx[4] = $xo[1];
         $xx[5] = $xo[2];
@@ -3409,13 +3407,13 @@ class sweph_calc
         for ($i = 0; $i <= 5; $i++)
             $xx[$i] = $pdp->x[$i];
         // cartesian equatorial coordinates
-        $this->parent->getSwePhp()->swephLib->swi_polcart_sp($xx, $xx);
-        $this->parent->getSwePhp()->swephLib->swi_coortrf2($xx, $xx,
+        SwephCotransUtils::swi_polcart_sp($xx, $xx);
+        SwephCotransUtils::swi_coortrf2($xx, $xx,
             -$this->parent->getSwePhp()->swed->oec->seps,
             $this->parent->getSwePhp()->swed->oec->ceps);
         // TODO: - t[-_-t]
         $xxo = [$xx[3], $xx[4], $xx[5]];
-        $this->parent->getSwePhp()->swephLib->swi_coortrf2($xxo, $xxo,
+        SwephCotransUtils::swi_coortrf2($xxo, $xxo,
             -$this->parent->getSwePhp()->swed->oec->seps,
             $this->parent->getSwePhp()->swed->oec->ceps);
         $xx[3] = $xxo[0];
@@ -3975,12 +3973,12 @@ class sweph_calc
             $xxa[$i][1] = 0;                        // latitude
             $xxa[$i][2] = $sema * (1 + $ecce);      // distance
             // transformation to ecliptic coordinates
-            $this->parent->getSwePhp()->swephLib->swi_polcart($xxa[$i], $xxa[$i]);
-            $this->parent->getSwePhp()->swephLib->swi_coortrf2($xxa[$i], $xxa[$i], $sinincl, $cosincl);
-            $this->parent->getSwePhp()->swephLib->swi_cartpol($xxa[$i], $xxa[$i]);
+            SwephCotransUtils::swi_polcart($xxa[$i], $xxa[$i]);
+            SwephCotransUtils::swi_coortrf2($xxa[$i], $xxa[$i], $sinincl, $cosincl);
+            SwephCotransUtils::swi_cartpol($xxa[$i], $xxa[$i]);
             // adding node, we get apogee in ecl. coord.
             $xxa[$i][0] += atan2($sinnode, $cosnode);
-            $this->parent->getSwePhp()->swephLib->swi_polcart($xxa[$i], $xxa[$i]);
+            SwephCotransUtils::swi_polcart($xxa[$i], $xxa[$i]);
             // new distance of node from orbital ellipse:
             // true anomaly of node:
             $ny = $this->parent->getSwePhp()->swephLib->swi_mod2PI($ny - $uu);
@@ -4031,21 +4029,18 @@ class sweph_calc
             for ($i = 0; $i <= 5; $i++)
                 $ndp->xreturn[6 + $i] = $ndp->x[$i];
             // polar ecliptic
-            $this->parent->getSwePhp()->swephLib->swi_cartpol_sp(
-                array_values(array_slice($ndp->xreturn, 6)), $ndp->xreturn);
+            SwephCotransUtils::swi_cartpol_sp(array_values(array_slice($ndp->xreturn, 6)), $ndp->xreturn);
             // cartesian equatorial
             // TODO: - t[-_-t]
             $xreto = [$ndp->xreturn[18], $ndp->xreturn[19], $ndp->xreturn[20]];
-            $this->parent->getSwePhp()->swephLib->swi_coortrf2(
-                array_values(array_slice($ndp->xreturn, 6)), $xreto, -$oe->seps, $oe->ceps);
+            SwephCotransUtils::swi_coortrf2(array_values(array_slice($ndp->xreturn, 6)), $xreto, -$oe->seps, $oe->ceps);
             $ndp->xreturn[18] = $xreto[0];
             $ndp->xreturn[19] = $xreto[1];
             $ndp->xreturn[20] = $xreto[2];
             if ($iflag & SweConst::SEFLG_SPEED) {
                 // TODO: - t[-_-t]
                 $xreto = [$ndp->xreturn[21], $ndp->xreturn[22], $ndp->xreturn[23]];
-                $this->parent->getSwePhp()->swephLib->swi_coortrf2(
-                    array_values(array_slice($ndp->xreturn, 9)), $xreto, -$oe->seps, $oe->ceps);
+                SwephCotransUtils::swi_coortrf2(array_values(array_slice($ndp->xreturn, 9)), $xreto, -$oe->seps, $oe->ceps);
                 $ndp->xreturn[21] = $xreto[0];
                 $ndp->xreturn[22] = $xreto[1];
                 $ndp->xreturn[23] = $xreto[2];
@@ -4054,7 +4049,7 @@ class sweph_calc
             if (!($iflag & SweConst::SEFLG_NONUT)) {
                 // TODO: - t[-_-t]
                 $xreto = [$ndp->xreturn[18], $ndp->xreturn[19], $ndp->xreturn[20]];
-                $this->parent->getSwePhp()->swephLib->swi_coortrf2($xreto, $xreto,
+                SwephCotransUtils::swi_coortrf2($xreto, $xreto,
                     -$this->parent->getSwePhp()->swed->nut->snut,
                     $this->parent->getSwePhp()->swed->nut->cnut);
                 $ndp->xreturn[18] = $xreto[0];
@@ -4063,7 +4058,7 @@ class sweph_calc
                 if ($iflag & SweConst::SEFLG_SPEED) {
                     // TODO: - t[-_-t]
                     $xreto = [$ndp->xreturn[21], $ndp->xreturn[22], $ndp->xreturn[23]];
-                    $this->parent->getSwePhp()->swephLib->swi_coortrf2($xreto, $xreto,
+                    SwephCotransUtils::swi_coortrf2($xreto, $xreto,
                         -$this->parent->getSwePhp()->swed->nut->snut,
                         $this->parent->getSwePhp()->swed->nut->cnut);
                     $ndp->xreturn[21] = $xreto[0];
@@ -4075,7 +4070,7 @@ class sweph_calc
             // TODO: - t[-_-t]
             $xreto = [$ndp->xreturn[12], $ndp->xreturn[13], $ndp->xreturn[14],
                 $ndp->xreturn[15], $ndp->xreturn[16], $ndp->xreturn[17]];
-            $this->parent->getSwePhp()->swephLib->swi_cartpol_sp(
+            SwephCotransUtils::swi_cartpol_sp(
                 array_values(array_slice($ndp->xreturn, 18)), $xreto);
             $ndp->xreturn[12] = $xreto[0];
             $ndp->xreturn[13] = $xreto[1];
@@ -4138,13 +4133,11 @@ class sweph_calc
                             $ndp->xreturn[11] = $xout[5];
                         }
                         // to polar
-                        $this->parent->getSwePhp()->swephLib->swi_cartpol_sp(
-                            array_values(array_slice($ndp->xreturn, 6)), $ndp->xreturn);
+                        SwephCotransUtils::swi_cartpol_sp(array_values(array_slice($ndp->xreturn, 6)), $ndp->xreturn);
                         // TODO: - t[-_-t]
                         $xreto = [$ndp->xreturn[12], $ndp->xreturn[13], $ndp->xreturn[14],
                             $ndp->xreturn[15], $ndp->xreturn[16], $ndp->xreturn[17]];
-                        $this->parent->getSwePhp()->swephLib->swi_cartpol_sp(
-                            array_values(array_slice($ndp->xreturn, 18)), $xreto);
+                        SwephCotransUtils::swi_cartpol_sp(array_values(array_slice($ndp->xreturn, 18)), $xreto);
                         $ndp->xreturn[12] = $xreto[0];
                         $ndp->xreturn[13] = $xreto[1];
                         $ndp->xreturn[14] = $xreto[2];
@@ -4155,8 +4148,7 @@ class sweph_calc
                         // this is a bit clumsy, but allows us to keep the
                         // sidereal code together
                     } else {
-                        $this->parent->getSwePhp()->swephLib->swi_cartpol_sp(
-                            array_values(array_slice($ndp->xreturn, 6)), $ndp->xreturn);
+                        SwephCotransUtils::swi_cartpol_sp(array_values(array_slice($ndp->xreturn, 6)), $ndp->xreturn);
                         if ($this->swi_get_ayanamsa_with_speed($ndp->teval, $iflag, $daya, $serr) == SweConst::ERR)
                             return SweConst::ERR;
                         $ndp->xreturn[0] -= $daya[0] * SweConst::DEGTORAD;
@@ -4164,7 +4156,7 @@ class sweph_calc
                         // TODO: - t[-_-t]
                         $xreto = [$ndp->xreturn[6], $ndp->xreturn[7], $ndp->xreturn[8],
                             $ndp->xreturn[9], $ndp->xreturn[10], $ndp->xreturn[11]];
-                        $this->parent->getSwePhp()->swephLib->swi_polcart_sp($ndp->xreturn, $xreto);
+                        SwephCotransUtils::swi_polcart_sp($ndp->xreturn, $xreto);
                         $ndp->xreturn[6] = $xreto[0];
                         $ndp->xreturn[7] = $xreto[1];
                         $ndp->xreturn[8] = $xreto[2];
@@ -4186,8 +4178,7 @@ class sweph_calc
                     // TODO: - t[-_-t]
                     $xreto = [$ndp->xreturn[12], $ndp->xreturn[13], $ndp->xreturn[14],
                         $ndp->xreturn[15], $ndp->xreturn[16], $ndp->xreturn[17]];
-                    $this->parent->getSwePhp()->swephLib->swi_cartpol_sp(
-                        array_values(array_slice($ndp->xreturn, 18)), $xreto);
+                    SwephCotransUtils::swi_cartpol_sp(array_values(array_slice($ndp->xreturn, 18)), $xreto);
                     $ndp->xreturn[12] = $xreto[0];
                     $ndp->xreturn[13] = $xreto[1];
                     $ndp->xreturn[14] = $xreto[2];
@@ -4196,7 +4187,7 @@ class sweph_calc
                     $ndp->xreturn[17] = $xreto[5];
                     // TODO: - t[-_-t]
                     $xout = [$ndp->xreturn[6], $ndp->xreturn[7], $ndp->xreturn[8]];
-                    $this->parent->getSwePhp()->swephLib->swi_coortrf2(
+                    SwephCotransUtils::swi_coortrf2(
                         array_values(array_slice($ndp->xreturn, 18)), $xout,
                         $this->parent->getSwePhp()->swed->oec2000->seps,
                         $this->parent->getSwePhp()->swed->oec2000->ceps);
@@ -4206,7 +4197,7 @@ class sweph_calc
                     if ($iflag & SweConst::SEFLG_SPEED) {
                         // TODO: - t[-_-t]
                         $xout = [$ndp->xreturn[9], $ndp->xreturn[10], $ndp->xreturn[11]];
-                        $this->parent->getSwePhp()->swephLib->swi_coortrf2(
+                        SwephCotransUtils::swi_coortrf2(
                             array_values(array_slice($ndp->xreturn, 21)), $xout,
                             $this->parent->getSwePhp()->swed->oec2000->seps,
                             $this->parent->getSwePhp()->swed->oec2000->ceps);
@@ -4214,8 +4205,7 @@ class sweph_calc
                         $ndp->xreturn[10] = $xout[1];
                         $ndp->xreturn[11] = $xout[2];
                     }
-                    $this->parent->getSwePhp()->swephLib->swi_cartpol_sp(
-                        array_values(array_slice($ndp->xreturn, 6)), $ndp->xreturn);
+                    SwephCotransUtils::swi_cartpol_sp(array_values(array_slice($ndp->xreturn, 6)), $ndp->xreturn);
                 }
             }
             /**********************
@@ -4237,6 +4227,6 @@ class sweph_calc
      */
     function intp_apsides(float $tjd, int $ipl, int $iflag, ?string &$serr = null): int
     {
-
+        // TODO: TBD
     }
 }

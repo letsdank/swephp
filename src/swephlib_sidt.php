@@ -1,5 +1,7 @@
 <?php
 
+use Utils\SwephCotransUtils;
+
 class swephlib_sidt
 {
     private SwephLib $parent;
@@ -44,8 +46,8 @@ class swephlib_sidt
         $xobl[1] = $this->parent->swi_epsiln(
                 Sweph::J2000 + $this->parent->swe_deltat_ex(Sweph::J2000, -1),
                 0) * SweConst::RADTODEG;
-        $this->parent->swi_polcart($xs, $xs);
-        $this->parent->swi_coortrf($xs, $xs, -$xobl[1] * SweConst::DEGTORAD);
+        SwephCotransUtils::swi_polcart($xs, $xs);
+        SwephCotransUtils::swi_coortrf($xs, $xs, -$xobl[1] * SweConst::DEGTORAD);
         // precess to mean equinox of date
         $this->parent->swi_precess($xs, $tjd_et, 0, -1);
         // to mean equinox of date
@@ -53,8 +55,8 @@ class swephlib_sidt
         $this->parent->swi_nutation($tjd_et, 0, $nutlo);
         $xobl[0] = $xobl[1] + $nutlo[1] * SweConst::RADTODEG;
         $xobl[2] = $nutlo[0] * SweConst::RADTODEG;
-        $this->parent->swi_coortrf($xs, $xs, $xobl[1] * SweConst::DEGTORAD);
-        $this->parent->swi_cartpol($xs, $xs);
+        SwephCotransUtils::swi_coortrf($xs, $xs, $xobl[1] * SweConst::DEGTORAD);
+        SwephCotransUtils::swi_cartpol($xs, $xs);
         $xs[0] *= SweConst::RADTODEG;
         $dhour = fmod($tjd_ut - 0.5, 1) * 360;
         // mean to true (if nut != 0)

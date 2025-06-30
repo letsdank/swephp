@@ -5,6 +5,7 @@ use Enums\SweModelBias;
 use Enums\SweModelJPLHorizon;
 use Enums\SweModelNutation;
 use Utils\ArrayUtils;
+use Utils\SwephCotransUtils;
 
 class swephlib_nut
 {
@@ -747,12 +748,12 @@ class swephlib_nut
             $dofs = ($t - $t0) * ($this->dcor_ra_jpl[$t0] - $this->dcor_ra_jpl[$t1]) + $this->dcor_ra_jpl[$t0];
         }
         $dofs /= (1000.0 * 3600.0);
-        $this->parent->swi_cartpol($x, $x);
+        SwephCotransUtils::swi_cartpol($x, $x);
         if ($backward)
             $x[0] -= $dofs * SweConst::DEGTORAD;
         else
             $x[0] += $dofs * SweConst::DEGTORAD;
-        $this->parent->swi_polcart($x, $x);
+        SwephCotransUtils::swi_polcart($x, $x);
     }
 
     // GCRS to J2000
