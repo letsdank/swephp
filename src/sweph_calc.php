@@ -406,7 +406,7 @@ class sweph_calc
                     break;
                 case SweConst::SEFLG_MOSEPH:
                     moshier_moon:
-                    $retc = $this->swi_moshmoon($tjd, true, null, $serr);
+                    $retc = $this->parent->getSwePhp()->sweMMoon->swi_moshmoon($tjd, true, serr: $serr);
                     if ($retc == SweConst::ERR)
                         goto return_error;
                     // for hel. position, we need earth as well
@@ -545,11 +545,12 @@ class sweph_calc
             $ndp =& $this->parent->getSwePhp()->swed->nddat[SweConst::SEI_MEAN_NODE];
             $xp = $ndp->xreturn;
             $xp2 = $ndp->x;
-            $retc = $this->swi_mean_node($tjd, $xp2, $serr);
+            $retc = $this->parent->getSwePhp()->sweMMoon->swi_mean_node($tjd, $xp2, $serr);
             if ($retc == SweConst::ERR)
                 goto return_error;
             // speed (is almost constant; variation < 0.001 arcsec)
-            $retc = $this->swi_mean_node($tjd - Sweph::MEAN_NODE_SPEED_INTV, array_slice($xp2, 3), $serr);
+            $retc = PointerUtils::pointerFn($xp2, 3,
+                fn(&$xp2p) => $this->parent->getSwePhp()->sweMMoon->swi_mean_node($tjd - Sweph::MEAN_NODE_SPEED_INTV, $xp2p, $serr));
             if ($retc == SweConst::ERR)
                 goto return_error;
             $xp2[3] = SwephLib::swe_difrad2n($xp2[0], $xp2[3]) / Sweph::MEAN_NODE_SPEED_INTV;
@@ -584,11 +585,12 @@ class sweph_calc
             $ndp =& $this->parent->getSwePhp()->swed->nddat[SweConst::SEI_MEAN_APOG];
             $xp = $ndp->xreturn;
             $xp2 = $ndp->x;
-            $retc = $this->swi_mean_apog($tjd, $xp2, $serr);
+            $retc = $this->parent->getSwePhp()->sweMMoon->swi_mean_apog($tjd, $xp2, $serr);
             if ($retc == SweConst::ERR)
                 goto return_error;
             // speed (is not constant! variation ~= several arcsec)
-            $retc = $this->swi_mean_apog($tjd - Sweph::MEAN_NODE_SPEED_INTV, array_slice($xp2, 3), $serr);
+            $retc = PointerUtils::pointerFn($xp2, 3,
+                fn(&$xp2p) => $this->parent->getSwePhp()->sweMMoon->swi_mean_apog($tjd - Sweph::MEAN_NODE_SPEED_INTV, $xp2p, $serr));
             if ($retc == SweConst::ERR)
                 goto return_error;
             for ($i = 0; $i <= 1; $i++)
@@ -1205,7 +1207,7 @@ class sweph_calc
                 if ($this->parent->getSwePhp()->swed->fidat[SweConst::SEI_FILE_MOON]->fptr != null) {
                     if (isset($serr))
                         $serr .= " \nusing Moshier eph. for moon; ";
-                    $retc = $this->swi_moshmoon($tjd, $do_save, $xpm, $serr);
+                    $retc = $this->parent->getSwePhp()->sweMMoon->swi_moshmoon($tjd, $do_save, $xpm, $serr);
                     if ($retc != SweConst::OK)
                         return $retc;
                 }
@@ -3797,7 +3799,7 @@ class sweph_calc
                         $t = $tjd + $speed_intv;
                     else
                         $t = $tjd;
-                    $retc = $this->swi_moshmoon($t, false, $xpos[$i], $serr);
+                    $retc = $this->parent->getSwePhp()->sweMMoon->swi_moshmoon($t, false, $xpos[$i], $serr);
                     if ($retc == SweConst::ERR)
                         return $retc;
                     // precession and nutation etc.
@@ -4076,7 +4078,7 @@ class sweph_calc
          *********************************************/
         for ($t = $tjd - $speedf1, $i = 0; $i < 3; $t += $speed_intv, $i++) {
             if (!($iflag & SweConst::SEFLG_SPEED) && $i != 1) continue;
-            $this->swi_intp_apsides($t, $xpos[$i], $ipl);
+            $this->parent->getSwePhp()->sweMMoon->swi_intp_apsides($t, $xpos[$i], $ipl);
         }
         /************************************************************
          * apsis with speed                                         *
