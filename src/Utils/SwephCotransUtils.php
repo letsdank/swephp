@@ -234,13 +234,8 @@ class SwephCotransUtils
         $x[4] *= SweConst::DEGTORAD;
         SwephCotransUtils::swi_polcart_sp($x, $x);
         SwephCotransUtils::swi_coortrf($x, $x, $e);
-        // TODO: - t[-_-t]
-        $xsp = [$x[3], $x[4], $x[5]];
-        SwephCotransUtils::swi_coortrf($xsp, $xsp, $e);
-        $x[3] = $xsp[0];
-        $x[4] = $xsp[1];
-        $x[5] = $xsp[2];
-        unset($xsp);
+        PointerUtils::pointerFn($x, 3,
+            fn(&$arr) => SwephCotransUtils::swi_coortrf($arr, $arr, $e));
         SwephCotransUtils::swi_cartpol_sp($x, $xpn);
         $xpn[0] *= SweConst::RADTODEG;
         $xpn[1] *= SweConst::RADTODEG;
