@@ -1,7 +1,7 @@
 <?php
 
 use Enums\SweModel;
-use Enums\SweModelJPLHorizon;
+use Enums\SweModelJPLHorizonApprox;
 use Enums\SweModelPrecession;
 
 class swephlib_precess
@@ -443,11 +443,11 @@ class swephlib_precess
         $is_jplhor = false;
         if ($prec_model == 0) $prec_model = SweModelPrecession::default();
         if ($prec_model_short == 0) $prec_model_short = SweModelPrecession::defaultShort();
-        if ($jplhora_model == 0) $jplhora_model = SweModelJPLHorizon::default();
+        if ($jplhora_model == 0) $jplhora_model = SweModelJPLHorizonApprox::default();
         if ($iflag & SwephLib::SEFLG_EPHMASK)
             $is_jplhor = true;
         if (($iflag & SweConst::SEFLG_JPLHOR_APPROX) &&
-            $jplhora_model == SweModelJPLHorizon::MOD_JPLHORA_3 &&
+            $jplhora_model == SweModelJPLHorizonApprox::MOD_JPLHORA_3 &&
             $J <= self::HORIZONS_TJD0_DPSI_DEPS_IAU1980)
             $is_jplhor = true;
         $T = ($J - 2451545.0) / 36525.0;
@@ -458,7 +458,7 @@ class swephlib_precess
                 $this->epsiln_owen_1986($J, $eps);
                 $eps *= SweConst::DEGTORAD;
             }
-        } else if (($iflag & SweConst::SEFLG_JPLHOR_APPROX) && $jplhora_model == SweModelJPLHorizon::MOD_JPLHORA_2) {
+        } else if (($iflag & SweConst::SEFLG_JPLHOR_APPROX) && $jplhora_model == SweModelJPLHorizonApprox::MOD_JPLHORA_2) {
             $eps = (((1.813e-3 * $T - 5.9e-4) * $T - 46.8150) * $T + 84381.448) * SweConst::DEGTORAD / 3600;
         } else if ($prec_model_short == SweModelPrecession::MOD_PREC_IAU_1976 && abs($T) <= self::PREC_IAU_1976_CTIES) {
             $eps = (((1.813e-3 * $T - 5.9e-4) * $T - 46.8150) * $T + 84381.448) * SweConst::DEGTORAD / 3600;
@@ -493,7 +493,7 @@ class swephlib_precess
             $eps *= SweConst::DEGTORAD;
         } else {
             $this->swi_ldp_peps($J, deps:$eps);
-            if (($iflag & SweConst::SEFLG_JPLHOR_APPROX) && $jplhora_model != SweModelJPLHorizon::MOD_JPLHORA_2) {
+            if (($iflag & SweConst::SEFLG_JPLHOR_APPROX) && $jplhora_model != SweModelJPLHorizonApprox::MOD_JPLHORA_2) {
                 $tofs = ($J - self::DCOR_EPS_JPL_TJD0) / 365.25;
                 $dofs = self::OFFSET_EPS_JPLHORIZONS;
                 if ($dofs < 0) {
@@ -849,11 +849,11 @@ class swephlib_precess
         $is_jplhor = false;
         if ($prec_model == 0) $prec_model = SweModelPrecession::default();
         if ($prec_model_short == 0) $prec_model_short = SweModelPrecession::defaultShort();
-        if ($jplhora_model == 0) $jplhora_model = SweModelJPLHorizon::default();
+        if ($jplhora_model == 0) $jplhora_model = SweModelJPLHorizonApprox::default();
         if ($iflag & SweConst::SEFLG_JPLHOR)
             $is_jplhor = true;
         if (($iflag & SweConst::SEFLG_JPLHOR_APPROX) &&
-            $jplhora_model == SweModelJPLHorizon::MOD_JPLHORA_3 &&
+            $jplhora_model == SweModelJPLHorizonApprox::MOD_JPLHORA_3 &&
             $J <= self::HORIZONS_TJD0_DPSI_DEPS_IAU1980)
             $is_jplhor = true;
         // JPL Horizons uses precession IAU 1976 and nutation IAU 1980 plus

@@ -2,7 +2,7 @@
 
 use Enums\SweModel;
 use Enums\SweModelBias;
-use Enums\SweModelJPLHorizon;
+use Enums\SweModelJPLHorizonApprox;
 use Enums\SweModelNutation;
 use Utils\ArrayUtils;
 use Utils\SwephCotransUtils;
@@ -621,11 +621,11 @@ class swephlib_nut
         $jplhora_model = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_JPLHORA_MODE->value];
         $is_jplhor = false;
         if ($nut_model == 0) $nut_model = SweModelNutation::default();
-        if ($jplhora_model == 0) $jplhora_model = SweModelJPLHorizon::default();
+        if ($jplhora_model == 0) $jplhora_model = SweModelJPLHorizonApprox::default();
         if ($iflag & SweConst::SEFLG_JPLHOR)
             $is_jplhor = true;
         if (($iflag & SweConst::SEFLG_JPLHOR_APPROX) &&
-            $jplhora_model == SweModelJPLHorizon::MOD_JPLHORA_3 &&
+            $jplhora_model == SweModelJPLHorizonApprox::MOD_JPLHORA_3 &&
             $J <= swephlib_precess::HORIZONS_TJD0_DPSI_DEPS_IAU1980)
             $is_jplhor = true;
         if ($is_jplhor) {
@@ -652,7 +652,7 @@ class swephlib_nut
             $this->calc_nutation_iau1980($J, $nutlo);
         } else if ($nut_model == SweModelNutation::MOD_NUT_IAU_2000A || $nut_model == SweModelNutation::MOD_NUT_IAU_2000B) {
             $this->calc_nutation_iau2000ab($J, $nutlo);
-            if (($iflag & SweConst::SEFLG_JPLHOR_APPROX) && $jplhora_model == SweModelJPLHorizon::MOD_JPLHORA_2) {
+            if (($iflag & SweConst::SEFLG_JPLHOR_APPROX) && $jplhora_model == SweModelJPLHorizonApprox::MOD_JPLHORA_2) {
                 $nutlo[0] += -41.7750 / 3600.0 / 1000.0 * SweConst::DEGTORAD;
                 $nutlo[1] += -6.8192 / 3600.0 / 1000.0 * SweConst::DEGTORAD;
             }
@@ -730,10 +730,10 @@ class swephlib_nut
         $t = ($tjd - self::DCOR_RA_JPL_TJD0) / 365.25;
         $dofs = self::OFFSET_JPLHORIZONS;
         $jplhora_model = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_JPLHORA_MODE->value];
-        if ($jplhora_model == 0) $jplhora_model = SweModelJPLHorizon::default();
+        if ($jplhora_model == 0) $jplhora_model = SweModelJPLHorizonApprox::default();
         if (!($iflag & SweConst::SEFLG_JPLHOR_APPROX))
             return;
-        if ($jplhora_model == SweModelJPLHorizon::MOD_JPLHORA_2)
+        if ($jplhora_model == SweModelJPLHorizonApprox::MOD_JPLHORA_2)
             return;
         if ($t < 0) {
             $t = 0;
@@ -764,13 +764,13 @@ class swephlib_nut
         $bias_model = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_BIAS->value];
         $jplhora_model = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_JPLHORA_MODE->value];
         if ($bias_model == 0) $bias_model = SweModelBias::default();
-        if ($jplhora_model == 0) $jplhora_model = SweModelJPLHorizon::default();
+        if ($jplhora_model == 0) $jplhora_model = SweModelJPLHorizonApprox::default();
         if ($bias_model == SweModelBias::MOD_BIAS_NONE)
             return;
         if ($iflag & SweConst::SEFLG_JPLHOR_APPROX) {
-            if ($jplhora_model == SweModelJPLHorizon::MOD_JPLHORA_2)
+            if ($jplhora_model == SweModelJPLHorizonApprox::MOD_JPLHORA_2)
                 return;
-            if ($jplhora_model == SweModelJPLHorizon::MOD_JPLHORA_3 && $tjd < swephlib_precess::DPSI_DEPS_IAU1980_TJD0_HORIZONS)
+            if ($jplhora_model == SweModelJPLHorizonApprox::MOD_JPLHORA_3 && $tjd < swephlib_precess::DPSI_DEPS_IAU1980_TJD0_HORIZONS)
                 return;
         }
         if ($bias_model == SweModelBias::MOD_BIAS_IAU2006) {
