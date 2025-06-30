@@ -13,6 +13,8 @@ class SwephLib extends SweModule
     const int SEFLG_EPHMASK = (SweConst::SEFLG_JPLEPH | SweConst::SEFLG_SWIEPH | SweConst::SEFLG_MOSEPH);
     const float SE_DELTAT_AUTOMATIC = -1E-10;
 
+    const float NCTIES = 6.0;     // nubmer of centuries per eph. file
+
     private swephlib_deltat $deltat;
     private swephlib_precess $precess;
     private swephlib_nut $nut;
@@ -334,6 +336,92 @@ class SwephLib extends SweModule
         return $tsid;
     }
 
+    /* SWISSEPH
+     * generates name of ephemeris file
+     * file name looks as follows:
+     * swephpl.m30, where
+     *
+     * "sweph"              	"swiss ephemeris"
+     * "pl","mo","as"               planet, moon, or asteroid
+     * "m"  or "_"                  BC or AD
+     *
+     * "30"                         start century
+     * tjd        	= ephemeris file for which julian day
+     * ipli       	= number of planet
+     * fname      	= ephemeris file name
+     */
+    function swi_gen_filename(float $tjd, int $ipli, string &$fname): void
+    {
+        $ncties = (int)self::NCTIES;
+        $jmon = 0;
+        $jday = 0;
+        $jyear = 0;
+        $jut = 0.;
+        switch ($ipli) {
+            case SweConst::SEI_MOON:
+                $fname = "semo";
+                break;
+            case SweConst::SEI_EMB:
+            case SweConst::SEI_MERCURY:
+            case SweConst::SEI_VENUS:
+            case SweConst::SEI_MARS:
+            case SweConst::SEI_JUPITER:
+            case SweConst::SEI_SATURN:
+            case SweConst::SEI_URANUS:
+            case SweConst::SEI_NEPTUNE:
+            case SweConst::SEI_PLUTO:
+            case SweConst::SEI_SUNBARY:
+                $fname = "sepl";
+                break;
+            case SweConst::SEI_CERES:
+            case SweConst::SEI_PALLAS:
+            case SweConst::SEI_JUNO:
+            case SweConst::SEI_VESTA:
+            case SweConst::SEI_CHIRON:
+            case SweConst::SEI_PHOLUS:
+                $fname = "seas";
+                break;
+            default: // asteroid or planetary moon
+                if ($ipli > Sweph::SE_PLMOON_OFFSET && $ipli < Sweph::SE_AST_OFFSET) {
+                    $fname = sprintf("sat%ssepm%d.%s", DIRECTORY_SEPARATOR, $ipli, SweConst::SE_FILE_SUFFIX);
+                } else {
+                    $sform = "ast%d%sse%05d.%s";
+                    if ($ipli - Sweph::SE_AST_OFFSET > 99999)
+                        $sform = "ast%d%ss%06d.%s";
+                    $fname = sprintf($sform, ($ipli - Sweph::SE_AST_OFFSET) / 1000, DIRECTORY_SEPARATOR,
+                        $ipli - Sweph::SE_AST_OFFSET, SweConst::SE_FILE_SUFFIX);
+                }
+                return; // asteroids or planetary moons: only one file 3000 bc - 3000 ad
+        }
+        // century of tjd
+        // if tjd > 1600 then gregorian calendar
+        if ($tjd >= 2305447.5) {
+            $gregflag = 1;
+            $this->swePhp->sweDate->swe_revjul($tjd, $gregflag, $jyear, $jmon, $jday, $jut);
+            // else julian calendar
+        } else {
+            $gregflag = 0;
+            $this->swePhp->sweDate->swe_revjul($tjd, $gregflag, $jyear, $jmon, $jday, $jut);
+        }
+        // start century of file containing tjd
+        if ($jyear < 0)
+            $sgn = -1;
+        else
+            $sgn = 1;
+        $icty = $jyear / 100;
+        if ($sgn < 0 && $jyear % 100 != 0)
+            $icty -= 1;
+        while ($icty % $ncties != 0)
+            $icty--;
+        // B.C. or A.D.
+        if ($icty < 0)
+            $fname .= "m";
+        else
+            $fname .= "_";
+        $icty = abs($icty);
+        $fname .= sprintf("%02d.%s", $icty, SweConst::SE_FILE_SUFFIX);
+    }
+
     /*******************************************************
      * other functions from swephlib.c;
      * they are not needed for Swiss Ephemeris,
@@ -598,16 +686,16 @@ class SwephLib extends SweModule
     }
 
     // TODO: Need to implement:
-    // * set_astro_models
-    // * swe_set_astro_models
-    // * get_precession_model
-    // * get_deltat_model
-    // * get_nutation_model
-    // * get_frame_bias_model
-    // * get_sidt_model
-    // * swe_get_astro_models
-    // * swi_strcpy?
-    // * swi_open_trace
+    //  * set_astro_models
+    //  * swe_set_astro_models
+    //  * get_precession_model
+    //  * get_deltat_model
+    //  * get_nutation_model
+    //  * get_frame_bias_model
+    //  * get_sidt_model
+    //  * swe_get_astro_models
+    //  * swi_strcpy?
+    //  * swi_open_trace
     //
 
     //////////////////////////////////////////////////

@@ -1,11 +1,14 @@
 <?php
 
 use Enums\SweModel;
+use Enums\SweModelJPLHorizon;
+use Enums\SweModelJPLHorizonApprox;
 use Enums\SweModelPrecession;
 use Enums\SwePlanet;
 use Enums\SweSiderealMode;
 use Structs\epsilon;
 use Structs\file_data;
+use Structs\meff_ele;
 use Structs\nut;
 use Structs\plan_data;
 use Structs\save_positions;
@@ -4052,7 +4055,519 @@ class sweph_calc
      */
     function intp_apsides(float $tjd, int $ipl, int $iflag, ?string &$serr = null): int
     {
-        // TODO: TBD
-        return 0;
+        $speed_intv = 0.1;
+        $xpos = ArrayUtils::createArray2D(3, 6);
+        $oe =& $this->parent->getSwePhp()->swed->oec;
+        $nut =& $this->parent->getSwePhp()->swed->nut;
+        $ndp =& $this->parent->getSwePhp()->swed->nddat[$ipl];
+        // if same calculation was done before, return
+        // if speed flag has been turned on, recompute
+        $flg1 = $iflag & ~SweConst::SEFLG_EQUATORIAL & ~SweConst::SEFLG_XYZ;
+        $flg2 = $ndp->xflgs & ~SweConst::SEFLG_EQUATORIAL & ~SweConst::SEFLG_XYZ;
+        $speedf1 = $ndp->xflgs & SweConst::SEFLG_SPEED;
+        $speedf2 = $iflag & SweConst::SEFLG_SPEED;
+        if ($tjd == $ndp->teval && $tjd != 0 && $flg1 == $flg2 && (!$speedf2 || $speedf1)) {
+            $ndp->xflgs = $iflag;
+            $ndp->iephe = $iflag & SweConst::SEFLG_MOSEPH;
+            return SweConst::OK;
+        }
+        /*********************************************
+         * now three apsides *
+         *********************************************/
+        for ($t = $tjd - $speedf1, $i = 0; $i < 3; $t += $speed_intv, $i++) {
+            if (!($iflag & SweConst::SEFLG_SPEED) && $i != 1) continue;
+            $this->swi_intp_apsides($t, $xpos[$i], $ipl);
+        }
+        /************************************************************
+         * apsis with speed                                         *
+         ************************************************************/
+        for ($i = 0; $i < 3; $i++) {
+            $xx[$i] = $xpos[1][$i];
+            $xx[$i + 3] = 0;
+        }
+        if ($iflag & SweConst::SEFLG_SPEED) {
+            $xx[3] = SwephLib::swe_difrad2n($xpos[2][0], $xpos[0][0]) / $speed_intv / 2.0;
+            $xx[4] = ($xpos[2][1] - $xpos[0][1]) / $speed_intv / 2.0;
+            $xx[5] = ($xpos[2][2] - $xpos[0][2]) / $speed_intv / 2.0;
+        }
+        $ndp->xreturn = [];
+        // ecliptic polar to cartesian
+        SwephCotransUtils::swi_polcart_sp($xx, $xx);
+        // light-time
+        if (!($iflag & SweConst::SEFLG_TRUEPOS)) {
+            $dt = sqrt(Sweph::square_num($xx)) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
+            for ($i = 1; $i < 3; $i++)
+                $xx[$i] -= $dt * $xx[$i + 3];
+        }
+        for ($i = 0; $i <= 5; $i++)
+            $ndp->xreturn[$i + 6] = $xx[$i];
+        // equatorial cartesian
+        SwephCotransUtils::swi_coortrf2_ptr($ndp->xreturn, 6,
+            $ndp->xreturn, 18, -$oe->seps, $oe->ceps);
+        if ($iflag & SweConst::SEFLG_SPEED)
+            SwephCotransUtils::swi_coortrf2_ptr($ndp->xreturn, 9,
+                $ndp->xreturn, 21, -$oe->seps, $oe->ceps);
+        $ndp->teval = $tjd;
+        $ndp->xflgs = $iflag;
+        $ndp->iephe = $iflag & Sweph::SEFLG_EPHMASK;
+        if ($iflag & SweConst::SEFLG_SIDEREAL) {
+            // apogee is referred to t;
+            // the ecliptic position must be transformed to t0
+
+            // rigorous algorithm
+            if (($this->parent->getSwePhp()->swed->sidd->sid_mode & SweConst::SE_SIDBIT_ECL_T0) ||
+                ($this->parent->getSwePhp()->swed->sidd->sid_mode & SweConst::SE_SIDBIT_SSY_PLANE)) {
+                for ($i = 0; $i <= 5; $i++)
+                    $x[$i] = $ndp->xreturn[18 + $i];
+                // precess to J2000
+                $this->parent->getSwePhp()->swephLib->swi_precess($x, $tjd, $iflag, SweConst::J_TO_J2000);
+                if ($iflag & SweConst::SEFLG_SPEED)
+                    $this->swi_precess_speed($x, $tjd, $iflag, SweConst::J_TO_J2000);
+                if ($this->parent->getSwePhp()->swed->sidd->sid_mode & SweConst::SE_SIDBIT_ECL_T0) {
+                    PointerUtils::pointer2Fn($ndp->xreturn, $ndp->xreturn, 6, 18,
+                        fn(&$xout, &$xoutr) => $this->swi_trop_ra2sid_lon($x, $xout, $xoutr, $iflag));
+                    // project onto solar system equator
+                } else if ($this->parent->getSwePhp()->swed->sidd->sid_mode & SweConst::SE_SIDBIT_SSY_PLANE) {
+                    PointerUtils::pointerFn($ndp->xreturn, 6,
+                        fn(&$xout) => $this->swi_trop_ra2sid_lon_sosy($x, $xout, $iflag));
+                }
+                // to polar
+                SwephCotransUtils::swi_cartpol_sp_ptr($ndp->xreturn, 6, $ndp->xreturn, 0);
+                SwephCotransUtils::swi_cartpol_sp_ptr($ndp->xreturn, 18, $ndp->xreturn, 12);
+            }
+        } else if ($iflag & SweConst::SEFLG_J2000) {
+            // node and apogee are referred to t;
+            // the ecliptic position must be transformed to J2000
+            for ($i = 0; $i <= 5; $i++)
+                $x[$i] = $ndp->xreturn[18 + $i];
+            // precess to J2000
+            $this->parent->getSwePhp()->swephLib->swi_precess($x, $tjd, $iflag, SweConst::J_TO_J2000);
+            if ($iflag & SweConst::SEFLG_SPEED)
+                $this->swi_precess_speed($x, $tjd, $iflag, SweConst::J_TO_J2000);
+            for ($i = 0; $i <= 5; $i++)
+                $ndp->xreturn[18 + $i] = $x[$i];
+            SwephCotransUtils::swi_cartpol_sp_ptr($ndp->xreturn, 18, $ndp->xreturn, 12);
+            SwephCotransUtils::swi_coortrf2_ptr($ndp->xreturn, 18, $ndp->xreturn, 6,
+                $this->parent->getSwePhp()->swed->oec2000->seps,
+                $this->parent->getSwePhp()->swed->oec2000->ceps);
+            if ($iflag & SweConst::SEFLG_SPEED)
+                SwephCotransUtils::swi_coortrf2_ptr($ndp->xreturn, 21, $ndp->xreturn, 9,
+                    $this->parent->getSwePhp()->swed->oec2000->seps,
+                    $this->parent->getSwePhp()->swed->oec2000->ceps);
+            SwephCotransUtils::swi_cartpol_sp_ptr($ndp->xreturn, 6, $ndp->xreturn, 0);
+        } else {
+            // tropical ecliptic positions
+            // prcession has already been taken into account, but not nutation
+            if (!($iflag & SweConst::SEFLG_NONUT)) {
+                PointerUtils::pointerFn($ndp->xreturn, 18,
+                    fn(&$xx) => $this->swi_nutate($xx, $iflag, false));
+            }
+            // equatorial polar
+            SwephCotransUtils::swi_cartpol_sp_ptr($ndp->xreturn, 18, $ndp->xreturn, 12);
+            // ecliptic cartesian
+            SwephCotransUtils::swi_coortrf2_ptr($ndp->xreturn, 18, $ndp->xreturn, 6, $oe->seps, $oe->ceps);
+            if ($iflag & SweConst::SEFLG_SPEED)
+                SwephCotransUtils::swi_coortrf2_ptr($ndp->xreturn, 21, $ndp->xreturn, 9, $oe->seps, $oe->ceps);
+            if (!($iflag & SweConst::SEFLG_NONUT)) {
+                SwephCotransUtils::swi_coortrf2_ptr($ndp->xreturn, 6, $ndp->xreturn, 6, $nut->snut, $nut->cnut);
+                if ($iflag & SweConst::SEFLG_SPEED)
+                    SwephCotransUtils::swi_coortrf2_ptr($ndp->xreturn, 9, $ndp->xreturn, 9, $nut->snut, $nut->cnut);
+            }
+            // ecliptic polar
+            SwephCotransUtils::swi_cartpol_sp_ptr($ndp->xreturn, 6, $ndp->xreturn, 0);
+        }
+        /**********************
+         * radians to degrees *
+         **********************/
+        for ($i = 0; $i < 2; $i++) {
+            $ndp->xreturn[$i] *= SweConst::RADTODEG;        // ecliptic
+            $ndp->xreturn[$i + 3] *= SweConst::RADTODEG;
+            $ndp->xreturn[$i + 12] *= SweConst::RADTODEG;   // equator
+            $ndp->xreturn[$i + 15] *= SweConst::RADTODEG;
+        }
+        $ndp->xreturn[0] = SwephLib::swe_degnorm($ndp->xreturn[0]);
+        $ndp->xreturn[12] = SwephLib::swe_degnorm($ndp->xreturn[12]);
+        return SweConst::OK;
+    }
+
+    /* transforms the position of the moon in a way we can use it
+     * for calculation of osculating node and apogee:
+     * precession and nutation (attention to speed vector!)
+     * according to flags
+     * iflag	flags
+     * tjd          time for which the element is computed
+     *              i.e. date of ecliptic
+     * xx           array equatorial cartesian position and speed
+     * serr         error string
+     */
+    function swi_plan_for_osc_elem(int $iflag, float $tjd, array &$xx): int
+    {
+        $nuttmp = new nut();
+        $nut =& $nuttmp;      // dummy assign, to silence gcc warning
+        $oe =& $this->parent->getSwePhp()->swed->oec;
+        $oectmp = new epsilon();
+        // ICRS to J2000
+        if (!($iflag & SweConst::SEFLG_ICRS) && $this->parent->swi_get_denum(SweConst::SEI_SUN, $iflag) >= 403) {
+            $this->swi_bias($xx, $tjd, $iflag, false);
+        }
+        /************************************************
+         * precession, equator 2000 -> equator of date  *
+         * attention: speed vector has to be rotated,   *
+         * but daily precession 0.137" may not be added!*/
+        // TODO: SID_TNODE_FROM_ECL_T0
+        $this->parent->getSwePhp()->swephLib->swi_precess($xx, $tjd, $iflag, SweConst::J2000_TO_J);
+        PointerUtils::pointerFn($xx, 3,
+            fn(&$R) => $this->parent->getSwePhp()->swephLib->swi_precess($R, $tjd, $iflag, SweConst::J2000_TO_J));
+        // epsilon
+        if ($tjd == $this->parent->getSwePhp()->swed->oec->teps) {
+            $oe =& $this->parent->getSwePhp()->swed->oec;
+        } else if ($tjd == Sweph::J2000) {
+            $oe =& $this->parent->getSwePhp()->swed->oec2000;
+        } else {
+            $this->calc_epsilon($tjd, $iflag, $oectmp);
+            $oe =& $oectmp;
+        }
+        // TODO: SID_TNODE_FROM_ECL_T0
+        /************************************************
+         * nutation                                     *
+         * again: speed vector must be rotated, but not *
+         * added 'speed' of nutation                    *
+         ************************************************/
+        if (!($iflag & SweConst::SEFLG_NONUT)) {
+            if ($tjd == $this->parent->getSwePhp()->swed->nut->tnut) {
+                $nutp =& $this->parent->getSwePhp()->swed->nut;
+            } else if ($tjd == Sweph::J2000) {
+                $nutp =& $this->parent->getSwePhp()->swed->nut2000;
+            } else if ($tjd == $this->parent->getSwePhp()->swed->nutv->tnut) {
+                $nutp =& $this->parent->getSwePhp()->swed->nutv;
+            } else {
+                $nutp =& $nuttmp;
+                $this->parent->getSwePhp()->swephLib->swi_nutation($tjd, $iflag, $nutp->nutlo);
+                $nutp->tnut = $tjd;
+                $nutp->snut = sin($nutp->nutlo[1]);
+                $nutp->cnut = cos($nutp->nutlo[1]);
+                $this->nut_matrix($nutp, $oe);
+            }
+            for ($i = 0; $i <= 2; $i++) {
+                $x[$i] = $xx[0] * $nutp->matrix[0][$i] +
+                    $xx[1] * $nutp->matrix[1][$i] +
+                    $xx[2] * $nutp->matrix[2][$i];
+            }
+            // speed:
+            // rotation only
+            for ($i = 0; $i <= 2; $i++) {
+                $x[$i + 3] = $xx[3] * $nutp->matrix[0][$i] +
+                    $xx[4] * $nutp->matrix[1][$i] +
+                    $xx[5] * $nutp->matrix[2][$i];
+            }
+            for ($i = 0; $i <= 5; $i++)
+                $xx[$i] = $x[$i];
+        }
+        /************************************************
+         * transformation to ecliptic                   *
+         ************************************************/
+        SwephCotransUtils::swi_coortrf2($xx, $xx, $oe->seps, $oe->ceps);
+        SwephCotransUtils::swi_coortrf2_ptr($xx, 3, $xx, 3, $oe->seps, $oe->ceps);
+        // TODO: SID_TNODE_FROM_ECL_T0
+        if (!($iflag & SweConst::SEFLG_NONUT)) {
+            SwephCotransUtils::swi_coortrf2($xx, $xx, $nutp->snut, $nutp->cnut);
+            SwephCotransUtils::swi_coortrf2_ptr($xx, 3, $xx, 3, $nutp->snut, $nutp->cnut);
+        }
+        return SweConst::OK;
+    }
+
+    static array $eff_arr = [];
+
+    static function init_eff_arr(): void
+    {
+        self::$eff_arr = [
+            /*
+               * r , m_eff for photon passing the sun at min distance r (fraction of Rsun)
+               * the values where computed with sun_model.c, which is a classic
+               * treatment of a photon passing a gravity field, multiplied by 2.
+               * The sun mass distribution m(r) is from Michael Stix, The Sun, p. 47.
+               */
+            new meff_ele(1.000, 1.000000),
+            new meff_ele(0.990, 0.999979),
+            new meff_ele(0.980, 0.999940),
+            new meff_ele(0.970, 0.999881),
+            new meff_ele(0.960, 0.999811),
+            new meff_ele(0.950, 0.999724),
+            new meff_ele(0.940, 0.999622),
+            new meff_ele(0.930, 0.999497),
+            new meff_ele(0.920, 0.999354),
+            new meff_ele(0.910, 0.999192),
+            new meff_ele(0.900, 0.999000),
+            new meff_ele(0.890, 0.998786),
+            new meff_ele(0.880, 0.998535),
+            new meff_ele(0.870, 0.998242),
+            new meff_ele(0.860, 0.997919),
+            new meff_ele(0.850, 0.997571),
+            new meff_ele(0.840, 0.997198),
+            new meff_ele(0.830, 0.996792),
+            new meff_ele(0.820, 0.996316),
+            new meff_ele(0.810, 0.995791),
+            new meff_ele(0.800, 0.995226),
+            new meff_ele(0.790, 0.994625),
+            new meff_ele(0.780, 0.993991),
+            new meff_ele(0.770, 0.993326),
+            new meff_ele(0.760, 0.992598),
+            new meff_ele(0.750, 0.991770),
+            new meff_ele(0.740, 0.990873),
+            new meff_ele(0.730, 0.989919),
+            new meff_ele(0.720, 0.988912),
+            new meff_ele(0.710, 0.987856),
+            new meff_ele(0.700, 0.986755),
+            new meff_ele(0.690, 0.985610),
+            new meff_ele(0.680, 0.984398),
+            new meff_ele(0.670, 0.982986),
+            new meff_ele(0.660, 0.981437),
+            new meff_ele(0.650, 0.979779),
+            new meff_ele(0.640, 0.978024),
+            new meff_ele(0.630, 0.976182),
+            new meff_ele(0.620, 0.974256),
+            new meff_ele(0.610, 0.972253),
+            new meff_ele(0.600, 0.970174),
+            new meff_ele(0.590, 0.968024),
+            new meff_ele(0.580, 0.965594),
+            new meff_ele(0.570, 0.962797),
+            new meff_ele(0.560, 0.959758),
+            new meff_ele(0.550, 0.956515),
+            new meff_ele(0.540, 0.953088),
+            new meff_ele(0.530, 0.949495),
+            new meff_ele(0.520, 0.945741),
+            new meff_ele(0.510, 0.941838),
+            new meff_ele(0.500, 0.937790),
+            new meff_ele(0.490, 0.933563),
+            new meff_ele(0.480, 0.928668),
+            new meff_ele(0.470, 0.923288),
+            new meff_ele(0.460, 0.917527),
+            new meff_ele(0.450, 0.911432),
+            new meff_ele(0.440, 0.905035),
+            new meff_ele(0.430, 0.898353),
+            new meff_ele(0.420, 0.891022),
+            new meff_ele(0.410, 0.882940),
+            new meff_ele(0.400, 0.874312),
+            new meff_ele(0.390, 0.865206),
+            new meff_ele(0.380, 0.855423),
+            new meff_ele(0.370, 0.844619),
+            new meff_ele(0.360, 0.833074),
+            new meff_ele(0.350, 0.820876),
+            new meff_ele(0.340, 0.808031),
+            new meff_ele(0.330, 0.793962),
+            new meff_ele(0.320, 0.778931),
+            new meff_ele(0.310, 0.763021),
+            new meff_ele(0.300, 0.745815),
+            new meff_ele(0.290, 0.727557),
+            new meff_ele(0.280, 0.708234),
+            new meff_ele(0.270, 0.687583),
+            new meff_ele(0.260, 0.665741),
+            new meff_ele(0.250, 0.642597),
+            new meff_ele(0.240, 0.618252),
+            new meff_ele(0.230, 0.592586),
+            new meff_ele(0.220, 0.565747),
+            new meff_ele(0.210, 0.537697),
+            new meff_ele(0.200, 0.508554),
+            new meff_ele(0.190, 0.478420),
+            new meff_ele(0.180, 0.447322),
+            new meff_ele(0.170, 0.415454),
+            new meff_ele(0.160, 0.382892),
+            new meff_ele(0.150, 0.349955),
+            new meff_ele(0.140, 0.316691),
+            new meff_ele(0.130, 0.283565),
+            new meff_ele(0.120, 0.250431),
+            new meff_ele(0.110, 0.218327),
+            new meff_ele(0.100, 0.186794),
+            new meff_ele(0.090, 0.156287),
+            new meff_ele(0.080, 0.128421),
+            new meff_ele(0.070, 0.102237),
+            new meff_ele(0.060, 0.077393),
+            new meff_ele(0.050, 0.054833),
+            new meff_ele(0.040, 0.036361),
+            new meff_ele(0.030, 0.020953),
+            new meff_ele(0.020, 0.009645),
+            new meff_ele(0.010, 0.002767),
+            new meff_ele(0.000, 0.000000)
+        ];
+    }
+
+    function meff(float $r): float
+    {
+        if ($r <= 0) return 0.0;
+        elseif ($r >= 1) return 1.0;
+        for ($i = 0; self::$eff_arr[$i]->r > $r; $i++)
+            ;
+        $f = ($r - self::$eff_arr[$i - 1]->r) / (self::$eff_arr[$i]->r - self::$eff_arr[$i - 1]->r);
+        $m = self::$eff_arr[$i - 1]->m + $f * (self::$eff_arr[$i]->m - self::$eff_arr[$i - 1]->m);
+        return $m;
+    }
+
+    function denormalize_positions(array &$x0, array $x1, array &$x2): void
+    {
+        // x*[0] = ecliptic longitude, x*[12] = rectascension
+        for ($i = 0; $i <= 12; $i += 12) {
+            if ($x1[$i] - $x0[$i] < -180)
+                $x0[$i] -= 360;
+            if ($x1[$i] - $x0[$i] > 180)
+                $x0[$i] += 360;
+            if ($x1[$i] - $x2[$i] < -180)
+                $x2[$i] -= 360;
+            if ($x1[$i] - $x2[$i] > 180)
+                $x2[$i] += 360;
+        }
+    }
+
+    function calc_speed(array $x0, array &$x1, array &$x2, float $dt): void
+    {
+        for ($j = 0; $j <= 18; $j += 6) {
+            for ($i = 0; $i < 3; $i++) {
+                $k = $j + $i;
+                $b = ($x2[$k] - $x0[$k]) / 2;
+                $a = ($x2[$k] - $x0[$k]) / 2 - $x1[$k];
+                $x1[$k + 3] = (2 * $a + $b) / $dt;
+            }
+        }
+    }
+
+    function swi_check_ecliptic(float $tjd, int $iflag): void
+    {
+        $swed =& $this->parent->getSwePhp()->swed;
+
+        if ($swed->oec2000->teps != Sweph::J2000) {
+            $this->calc_epsilon(Sweph::J2000, $iflag, $swed->oec2000);
+        }
+        if ($tjd == Sweph::J2000) {
+            $swed->oec->teps = $swed->oec2000->teps;
+            $swed->oec->eps = $swed->oec2000->eps;
+            $swed->oec->seps = $swed->oec2000->seps;
+            $swed->oec->ceps = $swed->oec2000->ceps;
+            return;
+        }
+        if ($swed->oec->teps != $tjd || $tjd == 0) {
+            $this->calc_epsilon($tjd, $iflag, $swed->oec);
+        }
+    }
+
+    /* computes nutation, if it is wanted and has not yet been computed.
+     * if speed flag has been turned on since last computation,
+     * nutation is recomputed */
+    function swi_check_nutation(float $tjd, int $iflag): void
+    {
+        $swed =& $this->parent->getSwePhp()->swed;
+
+        static $nutflag = 0;
+        $speedf1 = $nutflag & SweConst::SEFLG_SPEED;
+        $speedf2 = $iflag & SweConst::SEFLG_SPEED;
+        if (!($iflag & SweConst::SEFLG_NONUT) &&
+            ($tjd != $swed->nut->tnut || $tjd == 0) ||
+            (!$speedf1 && $speedf2)) {
+            $this->parent->getSwePhp()->swephLib->swi_nutation($tjd, $iflag, $swed->nut->nutlo);
+            $swed->nut->tnut = $tjd;
+            $swed->nut->snut = sin($swed->nut->nutlo[1]);
+            $swed->nut->cnut = cos($swed->nut->nutlo[1]);
+            $nutflag = $iflag;
+            $this->nut_matrix($swed->nut, $swed->oec);
+            if ($iflag & SweConst::SEFLG_SPEED) {
+                // once more for 'speed' of nutation, which is needed for
+                // planetary speeds
+                $t = $tjd - Sweph::NUT_SPEED_INTV;
+                $this->parent->getSwePhp()->swephLib->swi_nutation($t, $iflag, $swed->nutv->nutlo);
+                $swed->nutv->tnut = $t;
+                $swed->nutv->snut = sin($swed->nutv->nutlo[1]);
+                $swed->nutv->cnut = cos($swed->nutv->nutlo[1]);
+                $this->nut_matrix($swed->nutv, $swed->oec);
+            }
+        }
+    }
+
+    /* function
+     * - corrects nonsensical iflags
+     * - completes incomplete iflags
+     */
+    function plaus_iflag(int $iflag, int $ipl, float $tjd, ?string &$serr = null): int
+    {
+        $epheflag = 0;
+        $jplhor_model = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_JPLHOR_MODE->value];
+        $jplhora_model = $this->parent->getSwePhp()->swed->astro_models[SweModel::MODEL_JPLHORA_MODE->value];
+        if ($jplhor_model == 0) $jplhor_model = SweModelJPLHorizon::default();
+        if ($jplhora_model == 0) $jplhora_model = SweModelJPLHorizonApprox::default();
+        // either Horizons mode or simplified Horizons mode, not both
+        if ($iflag & SweConst::SEFLG_JPLHOR)
+            $iflag &= ~SweConst::SEFLG_JPLHOR_APPROX;
+        // if topocentric bit, turn helio- and barycentric bits off;
+        //
+        if ($iflag & SweConst::SEFLG_TOPOCTR) {
+            $iflag = $iflag & ~(SweConst::SEFLG_HELCTR | SweConst::SEFLG_BARYCTR);
+        }
+        // if barycentric bit, turn heliocentric bit off
+        if ($iflag & SweConst::SEFLG_BARYCTR)
+            $iflag = $iflag & ~(SweConst::SEFLG_HELCTR);
+        if ($iflag & SweConst::SEFLG_HELCTR)
+            $iflag = $iflag & ~(SweConst::SEFLG_BARYCTR);
+        // if heliocentric bit, turn aberration and deflection off
+        if ($iflag & (SweConst::SEFLG_HELCTR | SweConst::SEFLG_BARYCTR))
+            $iflag |= SweConst::SEFLG_NOABERR | SweConst::SEFLG_NOGDEFL;
+        // if no_precession bit is set, set also no_nutation bit
+        if ($iflag & SweConst::SEFLG_J2000)
+            $iflag |= SweConst::SEFLG_NONUT;
+        // if sidereal bit is set, set also no_nutation bit
+        // also turn JPL Horizons mode off
+        if ($iflag & SweConst::SEFLG_SIDEREAL) {
+            $iflag |= SweConst::SEFLG_NONUT;
+            $iflag = $iflag & ~(SweConst::SEFLG_JPLHOR | SweConst::SEFLG_JPLHOR_APPROX);
+        }
+        // if truepos is set, turn off grav. def. and aberration
+        if ($iflag & SweConst::SEFLG_TRUEPOS)
+            $iflag |= (SweConst::SEFLG_NOGDEFL | SweConst::SEFLG_NOABERR);
+        if ($iflag & SweConst::SEFLG_MOSEPH)
+            $epheflag = SweConst::SEFLG_MOSEPH;
+        if ($iflag & SweConst::SEFLG_SWIEPH)
+            $epheflag = SweConst::SEFLG_SWIEPH;
+        if ($iflag & SweConst::SEFLG_JPLEPH)
+            $epheflag = SweConst::SEFLG_JPLEPH;
+        if ($epheflag == 0)
+            $epheflag = SweConst::SEFLG_DEFAULTEPH;
+        $iflag = ($iflag & ~Sweph::SEFLG_EPHMASK) | $epheflag;
+        // SEFLG_JPLHOR only with JPL and Swiss Ephemeris
+        if (!($epheflag & SweConst::SEFLG_JPLEPH))
+            $iflag = $iflag & ~(SweConst::SEFLG_JPLHOR | SweConst::SEFLG_JPLHOR_APPROX);
+        // planets that have no JPL Horisons mode
+        if ($ipl == SwePlanet::OSCU_APOG->value || $ipl == SwePlanet::TRUE_NODE->value ||
+            $ipl == SwePlanet::MEAN_APOG->value || $ipl == SwePlanet::MEAN_NODE->value ||
+            $ipl == SwePlanet::INTP_APOG || $ipl == SwePlanet::INTP_PERG)
+            $iflag = $iflag & ~(SweConst::SEFLG_JPLHOR | SweConst::SEFLG_JPLHOR_APPROX);
+        if ($ipl >= Sweph::SE_FICT_OFFSET && $ipl <= Sweph::SE_FICT_MAX)
+            $iflag = $iflag & ~(SweConst::SEFLG_JPLHOR | SweConst::SEFLG_JPLHOR_APPROX);
+        // SEFLG_JPLHOR required SEFLG_ICRS, if calculated with * precession/nutation
+        // IAU 1980 and corrections dpsi, deps
+        if ($iflag & SweConst::SEFLG_JPLHOR) {
+            if ($this->parent->getSwePhp()->swed->eop_dpsi_loaded <= 0) {
+                if (isset($serr)) {
+                    switch ($this->parent->getSwePhp()->swed->eop_dpsi_loaded) {
+                        case 0:
+                            $serr = "you did not call swe_set_jpl_file(); default to SEFLG_JPLHOR_APPROX";
+                            break;
+                        case -1:
+                            $serr = "file eop_1962_today.txt not found; default to SEFLG_JPLHOR_APPROX";
+                            break;
+                        case -2:
+                            $serr = "file eop_1962_today.txt corrupt; default to SEFLG_JPLHOR_APPROX";
+                            break;
+                        case -3:
+                            $serr = "file eop_finals.txt corrupt; default to SEFLG_JPLHOR_APPROX";
+                            break;
+                    }
+                }
+                $iflag &= ~SweConst::SEFLG_JPLHOR;
+                $iflag |= SweConst::SEFLG_JPLHOR_APPROX;
+            }
+        }
+        if ($iflag & SweConst::SEFLG_JPLHOR)
+            $iflag |= SweConst::SEFLG_ICRS;
+        if (($iflag & SweConst::SEFLG_JPLHOR_APPROX) && $jplhora_model == SweModelJPLHorizonApprox::MOD_JPLHORA_2)
+            $iflag |= SweConst::SEFLG_ICRS;
+        return $iflag;
     }
 }
+
+sweph_calc::init_eff_arr();
