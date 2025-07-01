@@ -15,6 +15,7 @@ class SwePhp
     public SwephLib $swephLib;
     public SweJPL $sweJPL;
     public SweMMoon $sweMMoon;
+    public SweMPlan $sweMPlan;
 
     private function __construct()
     {
@@ -25,6 +26,7 @@ class SwePhp
         $this->swephLib = new SwephLib($this);
         $this->sweJPL = new SweJPL($this);
         $this->sweMMoon = new SweMMoon($this);
+        $this->sweMPlan = new SweMPlan($this);
     }
 
     public static function getInstance(): SwePhp

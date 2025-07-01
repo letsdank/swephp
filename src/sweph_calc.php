@@ -335,7 +335,7 @@ class sweph_calc
         if ($epheflag != SweConst::SEFLG_MOSEPH && !$this->parent->getSwePhp()->swed->ephe_path_is_set && !$this->parent->getSwePhp()->swed->jpl_file_is_open)
             $this->parent->swe_set_ephe_path(NULL);
         if (($iflag & SweConst::SEFLG_SIDEREAL) && !$this->parent->getSwePhp()->swed->ayana_is_set)
-            $this->parent->swe_set_sid_mode(SweSiderealMode::SIDM_FAGAN_BRADLEY, 0, 0);
+            $this->parent->swe_set_sid_mode(SweSiderealMode::SIDM_FAGAN_BRADLEY->value, 0, 0);
         /////////////////////////////////////////////////////
         // obliquity of ecliptic 2000 and of date
         /////////////////////////////////////////////////////
@@ -410,7 +410,8 @@ class sweph_calc
                     if ($retc == SweConst::ERR)
                         goto return_error;
                     // for hel. position, we need earth as well
-                    $retc = $this->swi_moshplan($tjd, SweConst::SEI_EARTH, true, null, null, $serr);
+                    $retc = $this->parent->getSwePhp()->sweMPlan->swi_moshplan($tjd, SweConst::SEI_EARTH,
+                        true, serr: $serr);
                     if ($retc == SweConst::ERR)
                         goto return_error;
                     break;
@@ -976,7 +977,7 @@ class sweph_calc
                 break;
             case SweConst::SEFLG_MOSEPH:
                 moshier_planet:
-                $retc = $this->swi_moshplan($tjd, $ipli, true, null, null, $serr);
+                $retc = $this->parent->getSwePhp()->sweMPlan->swi_moshplan($tjd, $ipli, true, serr: $serr);
                 if ($retc == SweConst::ERR)
                     return SweConst::ERR;
                 // geocentric, lighttime etc.
@@ -1055,7 +1056,8 @@ class sweph_calc
                 break;
             case SweConst::SEFLG_MOSEPH:
                 moshier_planet:
-                $retc = $this->swi_moshplan($tjd, $ipli, $do_save, $xp, $xe, $serr);
+                $retc = $this->parent->getSwePhp()->sweMPlan->swi_moshplan($tjd, $ipli, $do_save,
+                    $xp, $xe, $serr);
                 if ($retc == SweConst::ERR)
                     return SweConst::ERR;
                 for ($i = 0; $i <= 5; $i++)
@@ -1782,7 +1784,7 @@ class sweph_calc
                             $dx[$i] -= ($xobs[$i] - $xobs[$i + 3]);
                     }
                     // new dt
-                    $dt = sqrt(Sweph::square_num($dx)) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
+                    $dt = sqrt(Sweph::square_sum($dx)) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
                     for ($i = 0; $i <= 2; $i++) {       // rough apparent position at t-1
                         $xxsp[$i] = $xxsv[$i] - $dt * $xx0[$i + 3];
                     }
@@ -1798,7 +1800,7 @@ class sweph_calc
                     if (!($iflag & SweConst::SEFLG_HELCTR) && !($iflag & SweConst::SEFLG_BARYCTR))
                         $dx[$i] -= $xobs[$i];
                 }
-                $dt = sqrt(Sweph::square_num($dx)) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
+                $dt = sqrt(Sweph::square_sum($dx)) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
                 // new t
                 $t = $pdp->teval - $dt;
                 $dtsave_for_defl = $dt;
@@ -1881,11 +1883,11 @@ class sweph_calc
                     if ($iflag & SweConst::SEFLG_SPEED &&
                         !($iflag & (SweConst::SEFLG_HELCTR | SweConst::SEFLG_BARYCTR))) {
                         if ($ibody == self::IS_PLANET) {
-                            $retc = $this->swi_moshplan($t, $ipli, false, $xxsv, $xearth, $serr);
+                            $retc = $this->parent->getSwePhp()->sweMPlan->swi_moshplan($t, $ipli, false, $xxsv, $xearth, $serr);
                         } else {
                             $retc = $this->sweph($t, $ipli, $ifno, $iflag, null, false, $xxsv, $serr);
                             if ($retc == SweConst::OK)
-                                $retc = $this->swi_moshplan($t, SweConst::SEI_EARTH, false, $xearth, $xearth, $serr);
+                                $retc = $this->parent->getSwePhp()->sweMPlan->swi_moshplan($t, SweConst::SEI_EARTH, false, $xearth, $xearth, $serr);
                         }
                         if ($retc != SweConst::OK)
                             return $retc;
@@ -2478,7 +2480,7 @@ class sweph_calc
                             $dx[$i] -= ($xobs[$i] - $xobs[$i + 3]);
                     }
                     // new dt
-                    $dt = sqrt(Sweph::square_num($dx)) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
+                    $dt = sqrt(Sweph::square_sum($dx)) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
                     for ($i = 0; $i <= 2; $i++)
                         $xxsp[$i] = $xxsv[$i] - $dt * $pdp->x[$i + 3]; // rough apparent position
                 }
@@ -2494,7 +2496,7 @@ class sweph_calc
                         $dx[$i] -= $xobs[$i];
                 }
                 // new dt
-                $dt = sqrt(Sweph::square_num($dx)) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
+                $dt = sqrt(Sweph::square_sum($dx)) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
                 $dtsave_for_defl = $dt;
                 // new position: subtract t * speed
                 //
@@ -2678,10 +2680,10 @@ class sweph_calc
     {
         for ($i = 0; $i <= 5; $i++)
             $u[$i] = $xxs[$i] = $xx[$i];
-        $ru = sqrt(Sweph::square_num($u));
+        $ru = sqrt(Sweph::square_sum($u));
         for ($i = 0; $i <= 2; $i++)
             $v[$i] = $xe[$i + 3] / 24.0 / 3600.0 / Sweph::CLIGHT * Sweph::AUNIT;
-        $v2 = Sweph::square_num($v);
+        $v2 = Sweph::square_sum($v);
         $b_1 = sqrt(1 - $v2);
         $f1 = Sweph::dot_prod($u, $v) / $ru;
         $f2 = 1.0 + $f1 / (1.0 + $b_1);
@@ -2726,10 +2728,10 @@ class sweph_calc
         $intv = Sweph::PLAN_SPEED_INTV;
         for ($i = 0; $i <= 5; $i++)
             $u[$i] = $xxs[$i] = $xx[$i];
-        $ru = sqrt(Sweph::square_num($u));
+        $ru = sqrt(Sweph::square_sum($u));
         for ($i = 0; $i <= 2; $i++)
             $v[$i] = $xe[$i + 3] / 24.0 / 3600.0 / Sweph::CLIGHT * Sweph::AUNIT;
-        $v2 = Sweph::square_num($v);
+        $v2 = Sweph::square_sum($v);
         $b_1 = sqrt(1 - $v2);
         $f1 = Sweph::dot_prod($u, $v) / $ru;
         $f2 = 1.0 + $f1 / (1.0 + $b_1);
@@ -2742,7 +2744,7 @@ class sweph_calc
             //
             for ($i = 0; $i <= 2; $i++)
                 $u[$i] = $xxs[$i] - $intv * $xxs[$i + 3];
-            $ru = sqrt(Sweph::square_num($u));
+            $ru = sqrt(Sweph::square_sum($u));
             $f1 = Sweph::dot_prod($u, $v) / $ru;
             $f2 = 1.0 + $f1 / (1.0 + $b_1);
             for ($i = 0; $i <= 2; $i++)
@@ -2797,9 +2799,9 @@ class sweph_calc
         }
         for ($i = 0; $i <= 2; $i++)
             $q[$i] = $xx[$i] + $xearth[$i] - $xsun[$i];
-        $ru = sqrt(Sweph::square_num($u));
-        $rq = sqrt(Sweph::square_num($q));
-        $re = sqrt(Sweph::square_num($e));
+        $ru = sqrt(Sweph::square_sum($u));
+        $rq = sqrt(Sweph::square_sum($q));
+        $re = sqrt(Sweph::square_sum($e));
         for ($i = 0; $i <= 2; $i++) {
             $u[$i] /= $ru;
             $q[$i] /= $rq;
@@ -2870,9 +2872,9 @@ class sweph_calc
             for ($i = 0; $i <= 2; $i++)
                 $q[$i] = $u[$i] + $xearth[$i] - $xsun[$i] -
                     $dtsp * ($xearth[$i + 3] - $xsun[$i + 3]);
-            $ru = sqrt(Sweph::square_num($u));
-            $rq = sqrt(Sweph::square_num($q));
-            $re = sqrt(Sweph::square_num($e));
+            $ru = sqrt(Sweph::square_sum($u));
+            $rq = sqrt(Sweph::square_sum($q));
+            $re = sqrt(Sweph::square_sum($e));
             for ($i = 0; $i <= 2; $i++) {
                 $u[$i] /= $ru;
                 $q[$i] /= $rq;
@@ -2919,7 +2921,6 @@ class sweph_calc
         $xobs = [];
         $xearth = [];
         $xsun = [];
-        $xobs = [];
         $pedp =& $this->parent->getSwePhp()->swed->pldat[SweConst::SEI_EARTH];
         $psdp =& $this->parent->getSwePhp()->swed->pldat[SweConst::SEI_SUNBARY];
         $oe =& $this->parent->getSwePhp()->swed->oec2000;
@@ -2998,7 +2999,7 @@ class sweph_calc
                             $dx[$i] -= $xsun[$i];
                     }
                     // new t
-                    $dt = sqrt(Sweph::square_num($dx)) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
+                    $dt = sqrt(Sweph::square_sum($dx)) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
                     $t = $pedp->teval - $dt;
                     // new position
                     switch ($pedp->iephe) {
@@ -3026,7 +3027,7 @@ class sweph_calc
                             break;
                         case SweConst::SEFLG_MOSEPH:
                             if (($iflag & SweConst::SEFLG_HELCTR) || ($iflag & SweConst::SEFLG_BARYCTR))
-                                $retc = $this->swi_moshplan($t, SweConst::SEI_EARTH, false, $xearth, $xearth, $serr);
+                                $retc = $this->parent->getSwePhp()->sweMPlan->swi_moshplan($t, SweConst::SEI_EARTH, false, $xearth, $xearth, $serr);
                             // with moshier there is not barycentric sun
                             break;
                         default:
@@ -3159,7 +3160,7 @@ class sweph_calc
          *******************************/
         $t = $pdp->teval;
         if (($iflag & SweConst::SEFLG_TRUEPOS) == 0) {
-            $dt = sqrt(Sweph::square_num($xxm)) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
+            $dt = sqrt(Sweph::square_sum($xxm)) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
             $t = $pdp->teval - $dt;
             switch ($pdp->iephe) {
                 case SweConst::SEFLG_JPLEPH:
@@ -3271,7 +3272,7 @@ class sweph_calc
          * light-time *
          **************/
         if (!($iflag & SweConst::SEFLG_TRUEPOS)) {
-            $dt = sqrt(Sweph::square_num($xx)) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
+            $dt = sqrt(Sweph::square_sum($xx)) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
             for ($i = 0; $i <= 2; $i++)
                 $xx[$i] -= $dt * $xx[$i + 3];       // apparent position
         }
@@ -3728,7 +3729,7 @@ class sweph_calc
                     // used here. the error would be greater than the advantage
                     // of computation speed.
                     if (($iflag & SweConst::SEFLG_TRUEPOS) == 0 && $retc >= SweConst::OK) {
-                        $dt = sqrt(Sweph::square_num($xpos[$i])) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
+                        $dt = sqrt(Sweph::square_sum($xpos[$i])) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
                         $retc = $this->jplplan($t - $dt, $ipli, $iflag, false, $xpos[$i], serr: $serr);
                         // read error or corrupt file
                         if ($retc == SweConst::ERR)
@@ -3769,7 +3770,7 @@ class sweph_calc
                         return SweConst::ERR;
                     // light-time-corrected moon for apparent node (~ 0.006")
                     if (($iflag & SweConst::SEFLG_TRUEPOS) == 0 && $retc >= SweConst::OK) {
-                        $dt = sqrt(Sweph::square_num($xpos[$i])) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
+                        $dt = sqrt(Sweph::square_sum($xpos[$i])) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
                         $retc = $this->swemoon($t - $dt, $iflag | SweConst::SEFLG_SPEED, false, $xpos[$i], $serr);
                         if ($retc == SweConst::ERR)
                             return SweConst::ERR;
@@ -3871,8 +3872,8 @@ class sweph_calc
             $sinu = $xpos[$i][2] / $sinincl;
             $uu = atan2($sinu, $cosu);
             // semi-axis
-            $rxyz = sqrt(Sweph::square_num($xpos[$i]));
-            $v2 = Sweph::square_num(array_values(array_slice($xpos[$i], 3)));
+            $rxyz = sqrt(Sweph::square_sum($xpos[$i]));
+            $v2 = Sweph::square_sum(array_values(array_slice($xpos[$i], 3)));
             $sema = 1 / (2 / $rxyz - $v2 / $Gmsm);
             // eccentricity
             $pp = $c2 / $Gmsm;
@@ -3902,7 +3903,7 @@ class sweph_calc
             // new distance
             $r[0] = $sema * (1 - $ecce * $cosE);
             // old node distance
-            $r[1] = sqrt(Sweph::square_num($xx[$i]));
+            $r[1] = sqrt(Sweph::square_sum($xx[$i]));
             // correct length of position vector
             for ($j = 0; $j <= 2; $j++)
                 $xx[$i][$j] *= $r[0] / $r[1];
@@ -4097,7 +4098,7 @@ class sweph_calc
         SwephCotransUtils::swi_polcart_sp($xx, $xx);
         // light-time
         if (!($iflag & SweConst::SEFLG_TRUEPOS)) {
-            $dt = sqrt(Sweph::square_num($xx)) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
+            $dt = sqrt(Sweph::square_sum($xx)) * Sweph::AUNIT / Sweph::CLIGHT / 86400.0;
             for ($i = 1; $i < 3; $i++)
                 $xx[$i] -= $dt * $xx[$i + 3];
         }

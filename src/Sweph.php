@@ -89,7 +89,7 @@ class Sweph extends SweModule
 
     const float SE_LAPSE_RATE = 0.0065;                 // deg K / m, for refraction
 
-    public static function square_num(array $x): float
+    public static function square_sum(array $x): float
     {
         return $x[0] * $x[0] + $x[1] * $x[1] + $x[2] * $x[2];
     }
@@ -389,6 +389,10 @@ class Sweph extends SweModule
             // clean node data space
             for ($i = 0; $i < SweConst::SEI_NNODE_ETC; $i++)
                 $swed->nddat[$i] = new plan_data();
+            for ($i = 0; $i < SweConst::SEI_NPLANETS; $i++)
+                $swed->pldat[$i] = new plan_data();
+            for ($i = 0; $i < Sweph::SEI_NEPHFILES; $i++)
+                $swed->fidat[$i] = new file_data();
             return 1;
         }
         return 0;

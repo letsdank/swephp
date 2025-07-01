@@ -61,7 +61,7 @@ class plan_data
     // which ephemeris was used
     public int $iephe = 0;
     // position and speed vectors equatorial J2000
-    public array $x = [];
+    public array $x = [0., 0., 0., 0., 0., 0.,];
     // hel., light-time, aberr., prec. flags etc.
     public int $xflgs = 0;
     // return positions:
@@ -69,5 +69,10 @@ class plan_data
     // xreturn+6    ecliptic cartesian coordinates
     // xreturn+12   equatorial polar coordinates
     // xretrun+18   equatorial cartesian coordinates
-    public array $xreturn = [];
+    public array $xreturn = [
+        0., 0., 0., 0., 0., 0.,
+        0., 0., 0., 0., 0., 0.,
+        0., 0., 0., 0., 0., 0.,
+        0., 0., 0., 0., 0., 0.,
+    ];
 }

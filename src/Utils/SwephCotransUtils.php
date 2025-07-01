@@ -81,7 +81,7 @@ class SwephCotransUtils
         // zero position
         if ($x[0] == 0 && $x[1] == 0 && $x[2] == 0) {
             $ll[0] = $ll[1] = $ll[3] = $ll[4] = 0;
-            $ll[5] = sqrt(Sweph::square_num([$x[3], $x[4], $x[5]]));
+            $ll[5] = sqrt(Sweph::square_sum([$x[3], $x[4], $x[5]]));
             self::swi_cartpol([$x[3], $x[4], $x[5]], $ll);
             $ll[2] = 0;
             for ($i = 0; $i <= 5; $i++)
