@@ -645,25 +645,26 @@ class Sweph extends SweModule
         $s1 = $ephepath;
         // According to swi_cutstr() description, there is the one-line analogue:
         $cpos = array_filter(explode(DIRECTORY_SEPARATOR, $s1));
-        try {
-            for ($i = 0; $i <= count($cpos); $i++) {
-                $s = $cpos[$i];
-                if (strcmp($s, ".") == 0) { // current directory
-                    $s = '';
-                } else {
-                    $j = strlen($s);
-                    if (!empty($s) && $s[$j - 1] != DIRECTORY_SEPARATOR)
-                        $s .= DIRECTORY_SEPARATOR;
-                }
-                $s .= $fname;
-                $fnamp = $s;
-                $fp = fopen($fnamp, 'r');
-                if ($fp != null) return $fp;
+        for ($i = 0; $i <= count($cpos) - 1; $i++) {
+            $s = $cpos[$i];
+            if (strcmp($s, ".") == 0) { // current directory
+                $s = '';
+            } else {
+                $j = strlen($s);
+                if (!empty($s) && $s[$j - 1] != DIRECTORY_SEPARATOR)
+                    $s .= DIRECTORY_SEPARATOR;
             }
-        } catch (Exception $e) {
-            $s = sprintf("SwissEph file '%s' not found in PATH '%s'", $fname, $ephepath);
-            if (isset($serr)) $serr = $s;
+            $s .= $fname;
+            printf("try to open %s\n", $s);
+            try {
+                $fp = fopen($s, 'r');
+            } catch (Exception) {
+                $fp = null;
+            }
+            if ($fp != null) return $fp;
         }
+        $s = sprintf("SwissEph file '%s' not found in PATH '%s'", $fname, $ephepath);
+        if (isset($serr)) $serr = $s;
         return null;
     }
 

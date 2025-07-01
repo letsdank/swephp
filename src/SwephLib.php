@@ -702,6 +702,18 @@ class SwephLib extends SweModule
     // Placeholders used for private classes
     //////////////////////////////////////////////////
 
+    // chebyshev
+
+    static function swi_echeb(float $x, array $coef, int $ncf): float
+    {
+        return swephlib_chebyshev::swi_echeb($x, $coef, $ncf);
+    }
+
+    static function swi_edcheb(float $x, array $coef, int $ncf): float
+    {
+        return swephlib_chebyshev::swi_edcheb($x, $coef, $ncf);
+    }
+
     // precess
 
     function swi_epsiln(float $J, int $iflag): float
@@ -724,6 +736,11 @@ class SwephLib extends SweModule
     function swi_nutation(float $tjd, int $iflag, array &$nutlo): int
     {
         return $this->nut->swi_nutation($tjd, $iflag, $nutlo);
+    }
+
+    function swi_bias(array &$x, float $tjd, int $iflag, bool $backward): void
+    {
+        $this->nut->swi_bias($x, $tjd, $iflag, $backward);
     }
 
     // deltat

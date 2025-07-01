@@ -16,11 +16,11 @@ class SweCalcTest extends SweTestCase
 
     public function test_01()
     {
-        $flags = SweConst::SEFLG_SWIEPH | SweConst::SEFLG_SPEED;
+        $flags = SweConst::SEFLG_MOSEPH | SweConst::SEFLG_SPEED;
         $xx = [];
         $retflags = $this->swe->sweph->swe_calc(2452275.5, SwePlanet::SUN->value, $flags, $xx);
         $this->assertCount(6, $xx);
-        $this->assertEquals(258, $retflags);
+        $this->assertEquals(260, $retflags);
         $this->assertEquals($flags, $retflags);
         $this->assertEquals(280.38296810621137, $xx[0]);
         $this->assertEquals(0.0001496807056552454, $xx[1]);

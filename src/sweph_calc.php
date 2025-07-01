@@ -1378,7 +1378,7 @@ class sweph_calc
                 $xps = $psdp->x;
             }
             if (isset($xpsret))
-                for ($i == 0; $i <= 5; $i++)
+                for ($i = 0; $i <= 5; $i++)
                     $xpret[$i] = $xps[$i];
         }
         // earth is wanted
@@ -1479,7 +1479,7 @@ class sweph_calc
                 $pdp->refep = null;
                 if ($pdp->segp != null)
                     unset($pdp->segp);
-                $pdp->segp = null;
+                $pdp->segp = [];
             }
         }
         // if sweph file not open, find and open it
@@ -1966,7 +1966,7 @@ class sweph_calc
                 $xx[$i] = 0;
         // ICRS to J2000
         if (!($iflag & SweConst::SEFLG_ICRS) && $this->parent->swi_get_denum($ipli, $epheflag) >= 403)
-            $this->swi_bias($xx, $t, $iflag, false);
+            $this->parent->getSwePhp()->swephLib->swi_bias($xx, $t, $iflag, false);
         // save J2000 coordinates; required for sidereal positions
         for ($i = 0; $i <= 5; $i++)
             $xxsv[$i] = $xx[$i];
@@ -3065,7 +3065,7 @@ class sweph_calc
                 $xx[$i] = 0;
         // ICRS to J2000
         if (!($iflag & SweConst::SEFLG_ICRS) && $this->parent->swi_get_denum(SweConst::SEI_SUN, $iflag) >= 403) {
-            $this->swi_bias($xx, $t, $iflag, false);
+            $this->parent->getSwePhp()->swephLib->swi_bias($xx, $t, $iflag, false);
         }
         // save J2000 coordinates; required for sidereal positions
         for ($i = 0; $i <= 5; $i++)
@@ -3236,7 +3236,7 @@ class sweph_calc
                 $xx[$i] = 0;
         // ICRS to J2000
         if (!($iflag & SweConst::SEFLG_ICRS) && $this->parent->swi_get_denum(SweConst::SEI_MOON, $iflag) >= 403) {
-            $this->swi_bias($xx, $t, $iflag, false);
+            $this->parent->getSwePhp()->swephLib->swi_bias($xx, $t, $iflag, false);
         }
         // save J2000 coordinates; required for sidereal positions
         for ($i = 0; $i <= 5; $i++)
@@ -3281,7 +3281,7 @@ class sweph_calc
                 $xx[$i] = 0;
         // ICRS to J2000
         if (!($iflag & SweConst::SEFLG_ICRS) && $this->parent->swi_get_denum(SweConst::SEI_SUN, $iflag) >= 403) {
-            $this->swi_bias($xx, $psdp->teval, $iflag, false);
+            $this->parent->getSwePhp()->swephLib->swi_bias($xx, $psdp->teval, $iflag, false);
         }
         // save J2000 coordinates; required for sidereal positions
         for ($i = 0; $i <= 5; $i++)
@@ -3421,6 +3421,15 @@ class sweph_calc
      */
     function read_const(int $ifno, ?string &$serr = null): int
     {
+        $lastnam = 19;
+        $fdp =& $this->parent->getSwePhp()->swed->fidat[$ifno];
+        $serr_file_damage = "Ephemeris file %s is damages (0%s).";
+        $smsg = "";
+        $nbytes_ipl = 2;
+        $fp = $fdp->fptr;
+        /*************************************
+         * version number of file            *
+         *************************************/
         // TODO: TBD
         return SweConst::OK;
     }
@@ -3476,6 +3485,7 @@ class sweph_calc
         }
         // calculate cosine and sine of average perihelion longitude.
         for ($i = 0; $i < $nco; $i++) {
+            // TODO: What's happening here?
             $x[$i][0] = $chcfx[$i];
             $x[$i][1] = $chcfy[$i];
             $x[$i][2] = $chcfz[$i];
@@ -3529,6 +3539,7 @@ class sweph_calc
             }
         }
         for ($i = 0; $i < $nco; $i++) {
+            // TODO: What's happening here?
             $chcfx[$i] = $x[$i][0];
             $chcfy[$i] = $x[$i][1];
             $chcfz[$i] = $x[$i][2];
@@ -4211,7 +4222,7 @@ class sweph_calc
         $oectmp = new epsilon();
         // ICRS to J2000
         if (!($iflag & SweConst::SEFLG_ICRS) && $this->parent->swi_get_denum(SweConst::SEI_SUN, $iflag) >= 403) {
-            $this->swi_bias($xx, $tjd, $iflag, false);
+            $this->parent->getSwePhp()->swephLib->swi_bias($xx, $tjd, $iflag, false);
         }
         /************************************************
          * precession, equator 2000 -> equator of date  *
@@ -4570,6 +4581,19 @@ class sweph_calc
         if (($iflag & SweConst::SEFLG_JPLHOR_APPROX) && $jplhora_model == SweModelJPLHorizonApprox::MOD_JPLHORA_2)
             $iflag |= SweConst::SEFLG_ICRS;
         return $iflag;
+    }
+
+    function swi_force_app_pos_etc(): void
+    {
+        $swed =& $this->parent->getSwePhp()->swed;
+        for ($i = 0; $i < SweConst::SEI_NPLANETS; $i++)
+            $swed->pldat[$i]->xflgs = -1;
+        for ($i = 0; $i < SweConst::SEI_NNODE_ETC; $i++)
+            $swed->nddat[$i]->xflgs = -1;
+        for ($i = 0; $i < SwePlanet::count(); $i++) {
+            $swed->savedat[$i]->tsave = 0;
+            $swed->savedat[$i]->iflgsave = -1;
+        }
     }
 }
 
